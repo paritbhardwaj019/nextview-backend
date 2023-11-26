@@ -2,8 +2,9 @@
   "name": "next-kavach-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
+    "start": "node src/server.js",
     "start:dev": "nodemon src/server.js"
   },
   "keywords": [],
