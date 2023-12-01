@@ -111,6 +111,13 @@ module.exports = {
         });
       }
 
+      if (!user?.authType === "email" && !user.isEmailVerified) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "User's email not verified",
+        });
+      }
+
       if (user?.authType === "email" && !user?.email) {
         return res.status(httpStatus.BAD_REQUEST).json({
           status: "fail",
