@@ -3,6 +3,7 @@ const router = express.Router();
 const dealerController = require("../controllers/Dealer");
 const otpController = require("../controllers/OTP");
 
+router.route("/").get(dealerController.fetchAllDealers);
 router
   .post("/signup", dealerController.signUpDealer)
   .post("/signin", dealerController.signInDealer);

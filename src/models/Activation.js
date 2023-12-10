@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const mongoosePaginate = require("mongoose-paginate");
 
 const activationSchema = new mongoose.Schema(
   {
@@ -42,8 +41,6 @@ const activationSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-activationSchema.plugin(mongoosePaginate);
 
 const Activation = mongoose.model("Activation", activationSchema);
 module.exports = Activation;

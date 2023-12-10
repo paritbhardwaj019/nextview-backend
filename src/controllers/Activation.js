@@ -13,6 +13,7 @@ module.exports = {
       endDate = "",
       status = "",
     } = req.query;
+
     try {
       let query = {};
 
@@ -22,7 +23,7 @@ module.exports = {
             { licenseKey: { $regex: search, $options: "i" } },
             { licenseNo: { $regex: search, $options: "i" } },
             { email: { $regex: search, $options: "i" } },
-            { name: { $regex: search, $options: "i" } },
+            { name: { $in: [new RegExp(search, "i")] } },
           ],
         };
       }
@@ -39,8 +40,11 @@ module.exports = {
       }
 
       if (status) {
-        query.status = { $regex: new RegExp(status, "i") };
+        query.status = { $regex: new RegExp(`^${status}$`, "i") };
       }
+
+      const totalActivationsCount = await Activation.countDocuments(query);
+      const totalPages = Math.ceil(totalActivationsCount / limit);
 
       const allActivations = await Activation.find(query)
         .limit(limit * 1)
@@ -51,7 +55,9 @@ module.exports = {
         status: "success",
         msg: "Fetched All Activation",
         data: {
-          results: allActivations.length,
+          totalResults: totalActivationsCount,
+          totalPages: totalPages,
+          currentPage: parseInt(page),
           activations: allActivations,
         },
       });

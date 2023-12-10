@@ -271,4 +271,46 @@ module.exports = {
       });
     }
   },
+  fetchAllDealers: async (req, res) => {
+    const { page = 1, limit = 10, search = "" } = req.query;
+
+    try {
+      let query = {};
+
+      if (search) {
+        query = {
+          $or: [
+            { phoneNumber: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { ownerName: { $regex: search, $options: "i" } },
+          ],
+        };
+      }
+
+      const totalDealersCount = await Dealer.countDocuments(query);
+      const totalPages = Math.ceil(totalDealersCount / limit);
+
+      const allDealers = await Dealer.find(query)
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .exec();
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "Fetched All Dealers",
+        data: {
+          totalResults: totalDealersCount,
+          totalPages: totalPages,
+          currentPage: parseInt(page),
+          dealers: allDealers,
+        },
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
+        stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
 };

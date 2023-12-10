@@ -4,7 +4,6 @@ const dealerSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      required: true,
       default: "",
     },
     ownerName: {
