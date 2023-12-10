@@ -11,11 +11,7 @@ router
     upload.single("file"),
     nfrKeysController.addNFRKeys
   )
-  .get(
-    authenticationMiddleware("dealer"),
-    authenticationMiddleware("admin"),
-    nfrKeysController.fetchAllNFRKeys
-  );
+  .get(nfrKeysController.fetchAllNFRKeys);
 router
   .route(authenticationMiddleware("admin"), "/assign/:id")
   .patch(nfrKeysController.assignDealerToNFRKey);

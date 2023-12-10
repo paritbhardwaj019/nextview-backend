@@ -20,6 +20,8 @@ const authenticationMiddleware = (role) => (req, res, next) => {
       });
     }
 
+    console.log(decoded.user);
+
     if (decoded.user && decoded.user.role === role) {
       req.authUser = decoded.user;
       next();

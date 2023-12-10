@@ -172,11 +172,15 @@ module.exports = {
         expiresIn: "1h",
       });
 
+      await OTP.deleteMany({
+        $or: [{ number: phoneNumber }, { email: user.email }],
+      });
+
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "User authenticated successfully",
         token,
-        data: user,
+        data: { user, token },
       });
     } catch (error) {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
@@ -215,6 +219,7 @@ module.exports = {
           otp,
           name: user?.ownerName,
         });
+
         await sendMail({
           toEmail: user.email,
           toName: user.ownerName,
