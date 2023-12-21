@@ -13,4 +13,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Routes
 router.forEach(({ router, path }) => app.use("/api/v1" + path, router));
 
+app.get("/", (req, res) => res.send("Hello"));
+
 module.exports = app;
