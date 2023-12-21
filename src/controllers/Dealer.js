@@ -16,6 +16,7 @@ module.exports = {
 
     delete req.body.isPhoneVerified;
     delete req.body.isEmailVerified;
+    delete req.body.role;
 
     try {
       if (!authType) {
@@ -56,6 +57,7 @@ module.exports = {
         ...req.body,
         authType,
         password: hashedPassword,
+        role: "dealer",
       });
 
       await sendOTP({

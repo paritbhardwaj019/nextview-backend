@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const readline = require("readline");
-const { User } = require("../models");
+const { Dealer } = require("../models");
 const { dbUrl } = require("../config");
 const logger = require("../utils/logger");
 
@@ -34,10 +34,6 @@ const getUserDetails = () => {
   });
 };
 
-const logInfo = (message) => {
-  winston.info(message);
-};
-
 mongoose.connection
   .on("error", (error) => {
     logger.error("Error connecting to the database:", error);
@@ -48,11 +44,12 @@ mongoose.connection
     getUserDetails()
       .then(() => bcrypt.hash(userDetails.password, 10))
       .then((hashedPassword) => {
-        const newUser = new User({
-          name: userDetails.name,
-          phone: userDetails.phone,
+        const newUser = new Dealer({
+          ownerName: userDetails.name,
+          phoneNumber: userDetails.phone,
           password: hashedPassword,
           role: userDetails.role,
+          authType: "password",
         });
 
         return newUser.save();

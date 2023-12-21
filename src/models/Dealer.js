@@ -8,45 +8,36 @@ const dealerSchema = new mongoose.Schema(
     },
     ownerName: {
       type: String,
-      required: true,
     },
     panNumber: {
       type: String,
-      required: true,
     },
     panPhoto: {
       type: String,
     },
     companyName: {
       type: String,
-      required: true,
     },
     accountType: {
       type: String,
       enum: ["partner", "warrior"],
-      required: true,
       default: "partner",
     },
     phoneNumber: {
       type: String,
-      required: true,
     },
     address: {
       pincode: {
         type: String,
-        required: true,
       },
       district: {
         type: String,
-        required: true,
       },
       state: {
         type: String,
-        required: true,
       },
       country: {
         type: String,
-        required: true,
       },
     },
     referredBy: {
@@ -65,13 +56,15 @@ const dealerSchema = new mongoose.Schema(
     },
     isPhoneVerified: {
       type: String,
-      required: true,
       default: true,
     },
     isEmailVerified: {
       type: String,
-      required: true,
       default: true,
+    },
+    role: {
+      type: String,
+      enum: ["admin", "dealer"],
     },
     password: {
       type: String,
