@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const sendOtpViaFast2Sms = ({ phoneNumber }) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const otp = otpGenerator.generate(6, {
+      const otp = await otpGenerator.generate(6, {
         lowerCaseAlphabets: false,
         upperCaseAlphabets: false,
         specialChars: false,
@@ -26,9 +26,9 @@ const sendOtpViaFast2Sms = ({ phoneNumber }) => {
         Authorization: fast2SmsApiKey,
       });
       request.form({
-        variables_values: otp.toString(),
+        variables_values: otp?.toString(),
         route: "otp",
-        numbers: phoneNumber.toString(),
+        numbers: phoneNumber?.toString(),
       });
       request.end((response) => {
         if (response.error) {

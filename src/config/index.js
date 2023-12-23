@@ -16,4 +16,10 @@ module.exports = {
   jwtSecret: process.env.JWT_SECRET,
   frontendUrl: process.env.FRONTEND_URL,
   fast2SmsApiKey: process.env.FAST2SMS_API_KEY,
+  cloudinaryConfig: {
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  },
+  gstInApiKey: process.env.GSTIN_API_KEY,
 };

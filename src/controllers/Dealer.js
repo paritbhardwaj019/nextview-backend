@@ -8,6 +8,8 @@ const generateOTPEmail = require("../mail/generateOTPEmail");
 const generateVerificationEmail = require("../mail/generateVerificationEmail");
 const otpGenerator = require("otp-generator");
 const sendMail = require("../utils/sendMail");
+const uploadImageToCloudinary = require("../utils/uploadImageToCloudinary");
+const getGSTINDetails = require("../utils/getGSTINDetails");
 
 module.exports = {
   signUpDealer: async (req, res) => {
@@ -53,15 +55,27 @@ module.exports = {
         hashedPassword = await bcrypt.hash(req.body.password, 10);
       }
 
+      let panPhoto = "";
+      if (req?.file && req?.file?.fieldname === "panPhoto") {
+        const { secure_url } = await uploadImageToCloudinary(req.file.path);
+        panPhoto = secure_url;
+      }
+
+      let companyName = "";
+      if (req.body.accountType === "warrior") {
+        const data = await getGSTINDetails(req.body.gstInNumber);
+        companyName = data?.data?.lgnm;
+      } else {
+        companyName = req.body.companyName;
+      }
+
       const newDealer = await Dealer.create({
         ...req.body,
         authType,
         password: hashedPassword,
+        panPhoto,
+        companyName,
         role: "dealer",
-      });
-
-      await sendOTP({
-        phoneNumber,
       });
 
       if (authType === "email") {
@@ -204,6 +218,13 @@ module.exports = {
         });
       }
 
+      if (user?.authType === "email" && !user?.isEmailVerified) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "Email is not verified",
+        });
+      }
+
       const otp = otpGenerator.generate(6, {
         lowerCaseAlphabets: false,
         upperCaseAlphabets: false,
@@ -317,6 +338,47 @@ module.exports = {
         status: "fail",
         msg: error.message || "Something went wrong",
         stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
+  verifyEmail: async (req, res) => {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        status: "fail",
+        msg: "Token not provided in the request body.",
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, jwtSecret);
+      const newDealer = await Dealer.findOneAndUpdate(
+        { email: decoded?.email },
+        {
+          isEmailVerified: true,
+        },
+        {
+          new: true,
+        }
+      ).select("_id ownerName email isEmailVerified");
+
+      return res.status(200).json({
+        status: "success",
+        msg: "Email verified successfully.",
+        data: newDealer,
+      });
+    } catch (error) {
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({
+          status: "fail",
+          msg: "Token has expired.",
+        });
+      }
+
+      return res.status(401).json({
+        status: "fail",
+        msg: "Invalid token.",
       });
     }
   },

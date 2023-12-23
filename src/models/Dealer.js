@@ -55,18 +55,21 @@ const dealerSchema = new mongoose.Schema(
       default: "password",
     },
     isPhoneVerified: {
-      type: String,
-      default: true,
+      type: Boolean,
+      default: false,
     },
     isEmailVerified: {
-      type: String,
-      default: true,
+      type: Boolean,
+      default: false,
     },
     role: {
       type: String,
-      enum: ["admin", "dealer"],
+      enum: ["dealer"],
     },
     password: {
+      type: String,
+    },
+    gstInNumber: {
       type: String,
     },
   },
