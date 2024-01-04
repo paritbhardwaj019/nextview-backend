@@ -9,7 +9,7 @@ const generateVerificationEmail = require("../mail/generateVerificationEmail");
 const otpGenerator = require("otp-generator");
 const sendMail = require("../utils/sendMail");
 const uploadImageToCloudinary = require("../utils/uploadImageToCloudinary");
-const getGSTINDetails = require("../utils/getGSTINDetails");
+const generateWelcomeMail = require("../mail/generateWelcomeMail");
 
 module.exports = {
   signUpDealer: async (req, res) => {
@@ -30,12 +30,24 @@ module.exports = {
 
       let query = {};
       if (authType === "email") {
-        query = { $or: [{ email }, { phoneNumber }] };
+        query = {
+          $or: [{ email }, { phoneNumber }],
+        };
       } else if (authType === "phone" || authType === "password") {
         query = { phoneNumber };
       }
 
       const isDealerAlreadyExists = await Dealer.findOne(query);
+      const isWithGSTAlreadyExists = await Dealer.findOne({
+        gstInNumber: req.body.gstInNumber,
+      });
+
+      if (isWithGSTAlreadyExists) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "User with GSTIN Number already exists.",
+        });
+      }
 
       if (isDealerAlreadyExists) {
         let errMessage = `User with phone already exists.`;
@@ -61,24 +73,15 @@ module.exports = {
         panPhoto = secure_url;
       }
 
-      let companyName = "";
-      if (req.body.accountType === "warrior") {
-        const data = await getGSTINDetails(req.body.gstInNumber);
-        companyName = data?.data?.lgnm;
-      } else {
-        companyName = req.body.companyName;
-      }
-
       const newDealer = await Dealer.create({
         ...req.body,
         authType,
         password: hashedPassword,
         panPhoto,
-        companyName,
         role: "dealer",
       });
 
-      if (authType === "email") {
+      if (authType === "email" || authType === "phone") {
         const verificationToken = jwt.sign(
           { email: req.body.email },
           jwtSecret,
@@ -91,6 +94,7 @@ module.exports = {
           name: req.body.ownerName,
           link: link,
         });
+
         await sendMail({
           toEmail: req.body.email,
           toName: req.body.ownerName,
@@ -178,11 +182,20 @@ module.exports = {
             msg: "Invalid OTP. Please check your credentials.",
           });
         }
+
+        await Dealer.findOne(
+          { phoneNumber },
+          {
+            isPhoneVerified: true,
+          },
+          { new: true }
+        );
       }
 
       delete user.isPhoneVerified;
       delete user.password;
       delete user.isEmailVerified;
+      delete user.password;
 
       const token = jwt.sign({ user }, jwtSecret, {
         expiresIn: "1h",
@@ -238,7 +251,7 @@ module.exports = {
           email: user.email,
           otp: hashedOTP,
         });
-        const { body, text } = await generateOTPEmail({
+        const htmlPart = await generateOTPEmail({
           otp,
           name: user?.ownerName,
         });
@@ -247,8 +260,7 @@ module.exports = {
           toEmail: user.email,
           toName: user.ownerName,
           subject: "OTP for SignIn",
-          htmlPart: body,
-          textPart: text,
+          htmlPart,
         });
 
         return res.status(httpStatus.OK).json({
@@ -361,7 +373,22 @@ module.exports = {
         {
           new: true,
         }
-      ).select("_id ownerName email isEmailVerified");
+      ).select("_id ownerName email isEmailVerified phoneNumber gstInNumber");
+
+      const htmlPart = await generateWelcomeMail({
+        name: newDealer?.ownerName,
+        phoneNumber: newDealer?.phoneNumber,
+        email: newDealer?.email,
+        gstInNumber: newDealer?.gstInNumber,
+      });
+
+      await sendMail({
+        toEmail: newDealer.email,
+        subject: "Welcome to Nextview Kavach",
+        htmlPart,
+        textPart: "",
+        toName: newDealer?.ownerName,
+      });
 
       return res.status(200).json({
         status: "success",
@@ -369,6 +396,8 @@ module.exports = {
         data: newDealer,
       });
     } catch (error) {
+      console.log(error);
+
       if (error.name === "TokenExpiredError") {
         return res.status(401).json({
           status: "fail",
@@ -379,6 +408,149 @@ module.exports = {
       return res.status(401).json({
         status: "fail",
         msg: "Invalid token.",
+      });
+    }
+  },
+  verifyPhone: async (req, res) => {
+    try {
+      const { phoneNumber, otp } = req.body;
+
+      const user = await Dealer.findOne({ phoneNumber });
+
+      if (!user) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "User not found. Please check your phone number.",
+        });
+      }
+
+      const otpHolder = await OTP.find({
+        number: phoneNumber,
+      });
+
+      if (!otpHolder.length) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "No OTP found for the provided phone number.",
+        });
+      }
+
+      const rightOtpFind = otpHolder[otpHolder.length - 1];
+      const validUser = await bcrypt.compare(otp, rightOtpFind.otp);
+
+      if (!(otpHolder && validUser)) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "Invalid OTP. Please check your credentials.",
+        });
+      }
+
+      // Mark phone as verified
+      await Dealer.findOneAndUpdate(
+        { phoneNumber },
+        { isPhoneVerified: true },
+        { new: true }
+      );
+
+      await OTP.deleteMany({
+        number: phoneNumber,
+      });
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "Phone number verified successfully",
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
+      });
+    }
+  },
+  sendOTPAfterSignup: async (req, res) => {
+    const { phoneNumber } = req.body;
+
+    try {
+      const user = await Dealer.findOne({ phoneNumber });
+
+      if (!user) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "User not found. Please check your phone number.",
+        });
+      }
+
+      await sendOTP({
+        phoneNumber,
+      });
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "OTP sent successfully after signup",
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
+      });
+    }
+  },
+  editDealerById: async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const user = await Dealer.findById(id);
+
+      if (!user) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "Dealer not found. Please check the provided ID.",
+        });
+      }
+
+      const updatedDealer = await Dealer.findByIdAndUpdate(id, req.body, {
+        new: true,
+      });
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "Dealer updated successfully",
+        data: updatedDealer,
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
+      });
+    }
+  },
+
+  deleteDealerById: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const user = await Dealer.findById(dealerId);
+
+      if (!user) {
+        return res.status(httpStatus.BAD_REQUEST).json({
+          status: "fail",
+          msg: "Dealer not found. Please check the provided ID.",
+        });
+      }
+
+      await Dealer.findByIdAndDelete(id);
+
+      await OTP.deleteMany({ number: user.phoneNumber });
+
+      res.status(httpStatus.NOT_FOUND).json({
+        status: "success",
+        msg: "Dealer deleted successfully",
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
       });
     }
   },

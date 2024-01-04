@@ -22,4 +22,6 @@ module.exports = {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME,
   },
   gstInApiKey: process.env.GSTIN_API_KEY,
+  gmailId: process.env.GMAIL_ID,
+  gmailPassword: process.env.GMAIL_PASSWORD,
 };

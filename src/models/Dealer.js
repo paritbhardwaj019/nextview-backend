@@ -27,16 +27,19 @@ const dealerSchema = new mongoose.Schema(
       type: String,
     },
     address: {
-      pincode: {
+      pinCode: {
         type: String,
       },
-      district: {
+      street: {
         type: String,
       },
       state: {
         type: String,
       },
       country: {
+        type: String,
+      },
+      city: {
         type: String,
       },
     },
