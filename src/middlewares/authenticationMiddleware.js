@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const httpStatus = require("http-status");
 const { jwtSecret } = require("../config");
 
-const authenticationMiddleware = (role) => (req, res, next) => {
+const authenticationMiddleware = (allowedRoles) => (req, res, next) => {
   const token = req.headers.authorization;
 
   if (!token) {
@@ -20,7 +20,7 @@ const authenticationMiddleware = (role) => (req, res, next) => {
       });
     }
 
-    if (decoded.user && decoded.user.role === role) {
+    if (allowedRoles.includes(decoded.user.role)) {
       req.authUser = decoded.user;
       next();
     } else {

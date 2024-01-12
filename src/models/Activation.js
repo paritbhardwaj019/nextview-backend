@@ -31,7 +31,7 @@ const activationSchema = new mongoose.Schema(
       type: String,
     },
     purchasedOn: {
-      type: Date,
+      type: String,
     },
     status: {
       type: String,

@@ -75,6 +75,9 @@ const dealerSchema = new mongoose.Schema(
     gstInNumber: {
       type: String,
     },
+    profilePic: {
+      type: String,
+    },
   },
   {
     timestamps: true,
