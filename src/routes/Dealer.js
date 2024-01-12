@@ -14,7 +14,12 @@ router
 
 router
   .route("/:id")
-  .put(authenticationMiddleware("admin"), dealerController.editDealerById)
+  .put(
+    upload.single("profilePic"),
+    authenticationMiddleware("dealer"),
+    authenticationMiddleware("admin"),
+    dealerController.editDealerById
+  )
   .delete(authenticationMiddleware("admin"), dealerController.deleteDealerById);
 
 router.post("/verify-email", dealerController.verifyEmail);

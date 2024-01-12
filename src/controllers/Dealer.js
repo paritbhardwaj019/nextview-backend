@@ -497,6 +497,9 @@ module.exports = {
   },
   editDealerById: async (req, res) => {
     const { id } = req.params;
+    delete req.body.authType;
+    delete req.body.isPhoneVerified;
+    delete req.body.isEmailVerified;
 
     try {
       const user = await Dealer.findById(id);
@@ -508,9 +511,19 @@ module.exports = {
         });
       }
 
-      const updatedDealer = await Dealer.findByIdAndUpdate(id, req.body, {
-        new: true,
-      });
+      let profilePic = "";
+      if (req.body.profilePic) {
+        const { secure_url } = await uploadImageToCloudinary(req.file.path);
+        profilePic = secure_url;
+      }
+
+      const updatedDealer = await Dealer.findByIdAndUpdate(
+        id,
+        { ...req.body, profilePic },
+        {
+          new: true,
+        }
+      );
 
       res.status(httpStatus.OK).json({
         status: "success",

@@ -14,6 +14,8 @@ module.exports = {
       status = "",
     } = req.query;
 
+    const { role } = req.authUser;
+
     try {
       let query = {};
 
@@ -43,6 +45,10 @@ module.exports = {
         query.status = { $regex: new RegExp(`^${status}$`, "i") };
       }
 
+      if (role === "dealer") {
+        query.phoneNumber = req.authUser?.phoneNumber;
+      }
+
       const totalActivationsCount = await Activation.countDocuments(query);
       const totalPages = Math.ceil(totalActivationsCount / limit);
 
@@ -69,6 +75,7 @@ module.exports = {
       });
     }
   },
+
   uploadActivations: async (req, res) => {
     try {
       const file = excelReader.readFile(req.file.path);
