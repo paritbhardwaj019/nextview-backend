@@ -2,6 +2,7 @@ const httpStatus = require("http-status");
 const { Activation } = require("../models");
 const excelReader = require("xlsx");
 const { nodeEnv } = require("../config");
+const fs = require("fs");
 
 module.exports = {
   fetchAllActivations: async (req, res) => {
@@ -107,6 +108,7 @@ module.exports = {
       }
 
       await Activation.insertMany(allData);
+      await fs.unlink(req.file.path);
 
       res.status(httpStatus.CREATED).json({
         status: "success",
@@ -117,7 +119,7 @@ module.exports = {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing Excel file",
-        error: nodeEnv === "dev" ? error.message : {},
+        stack: nodeEnv === "dev" ? error.stack : {},
       });
     }
   },

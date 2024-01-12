@@ -5,6 +5,7 @@ const activationSchema = new mongoose.Schema(
     licenseNo: {
       type: String,
       required: true,
+      unique: true,
     },
     licenseKey: {
       type: String,

@@ -2,6 +2,7 @@ const DealerRouter = require("./Dealer");
 const ActivationRouter = require("./Activation");
 const NFRKeysRouter = require("./NFRKey");
 const UserRouter = require("./User");
+const KeyRouter = require("./Key");
 
 module.exports = [
   {
@@ -19,5 +20,9 @@ module.exports = [
   {
     path: "/admin",
     router: UserRouter,
+  },
+  {
+    path: "/keys",
+    router: KeyRouter,
   },
 ];
