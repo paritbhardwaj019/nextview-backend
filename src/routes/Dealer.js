@@ -16,8 +16,7 @@ router
   .route("/:id")
   .put(
     upload.single("profilePic"),
-    authenticationMiddleware("dealer"),
-    authenticationMiddleware("admin"),
+    authenticationMiddleware(["dealer", "admin"]),
     dealerController.editDealerById
   )
   .delete(authenticationMiddleware("admin"), dealerController.deleteDealerById);

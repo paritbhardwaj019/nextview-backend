@@ -14,10 +14,17 @@ const authenticationMiddleware = (allowedRoles) => (req, res, next) => {
 
   jwt.verify(token, jwtSecret, (err, decoded) => {
     if (err) {
-      return res.status(httpStatus.UNAUTHORIZED).json({
-        status: "fail",
-        msg: "Unauthorized: Invalid token",
-      });
+      if (err.name === "TokenExpiredError") {
+        return res.status(httpStatus.UNAUTHORIZED).json({
+          status: "fail",
+          msg: "Unauthorized: Token has expired",
+        });
+      } else {
+        return res.status(httpStatus.UNAUTHORIZED).json({
+          status: "fail",
+          msg: "Unauthorized: Invalid token",
+        });
+      }
     }
 
     if (allowedRoles.includes(decoded.user.role)) {

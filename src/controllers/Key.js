@@ -2,56 +2,73 @@ const httpStatus = require("http-status");
 const { nodeEnv } = require("../config");
 const excelReader = require("xlsx");
 const { Activation, Key } = require("../models");
+const fs = require("fs");
 
 module.exports = {
   uploadKeys: async (req, res) => {
     const { type } = req.body;
+
     try {
       const file = excelReader.readFile(req.file.path);
       const sheetNames = file.SheetNames;
-      const allData = [];
-      const count = await Key.countDocuments();
 
-      const sheetProcessingPromises = sheetNames.map(
-        async (sheetName, index) => {
-          const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
+      const bulkData = [];
 
-          const formattedData = arr.map(
-            async (
-              { ["Box No"]: boxNo, LICENSE: license, KEY: key },
-              innerIndex
-            ) => {
-              const existingActivation = await Activation.findOne({
-                licenseNo: license,
+      for (const sheetName of sheetNames) {
+        const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
+
+        arr.forEach(
+          ({ ["Sub Box No"]: subBoxNo, LICENSE: license, KEY: key }) => {
+            const index = bulkData.findIndex(
+              (item) =>
+                item.subBoxNo === subBoxNo &&
+                item.license === license &&
+                item.key === key
+            );
+
+            console.log("Sub box: ", subBoxNo);
+            console.log("key: ", key);
+            console.log("license: ", license);
+
+            if (index === -1) {
+              bulkData.push({
+                subBoxNo,
+                license,
+                key,
+                type,
               });
-
-              if (!existingActivation) {
-                return {
-                  boxNo,
-                  license,
-                  key,
-                  type,
-                  seq: count + index * arr.length + innerIndex + 1,
-                };
-              }
-
-              return null;
             }
-          );
+          }
+        );
+      }
 
-          allData.push(...formattedData);
-        }
+      const existingActivations = await Activation.find({
+        licenseNo: { $in: bulkData.map((data) => data.license) },
+      });
+      const existingKeys = await Key.find({
+        $or: [
+          { license: { $in: bulkData.map((data) => data.license) } },
+          { key: { $in: bulkData.map((data) => data.key) } },
+        ],
+      });
+
+      const filteredData = bulkData.filter(
+        (data) =>
+          !existingActivations.some(
+            (activation) => activation.licenseNo === data.license
+          ) &&
+          !existingKeys.some(
+            (existingKey) =>
+              existingKey.license === data.license ||
+              existingKey.key === data.key
+          )
       );
-
-      await Promise.all(sheetProcessingPromises);
-
-      const filteredData = allData.filter((entry) => entry !== undefined);
 
       if (filteredData.length > 0) {
         await Key.insertMany(filteredData);
       }
 
-      await fs.unlink(req.file.path);
+      await fs.unlinkSync(req.file.path);
 
       res.status(httpStatus.CREATED).json({
         status: "success",
@@ -90,6 +107,12 @@ module.exports = {
         .skip((page - 1) * limit)
         .exec();
 
+      console.log({
+        totalResults: totalKeysCount,
+        totalPages: totalPages,
+        currentPage: parseInt(page),
+      });
+
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Fetched All Keys",
@@ -121,8 +144,6 @@ module.exports = {
       }
 
       await Key.deleteOne({ _id: id });
-
-      await Key.updateMany({ seq: { $gt: key.seq } }, { $inc: { seq: -1 } });
 
       res.status(httpStatus.OK).json({
         status: "success",

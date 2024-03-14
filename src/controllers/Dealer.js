@@ -312,7 +312,9 @@ module.exports = {
     }
   },
   fetchAllDealers: async (req, res) => {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const page = +req.query?.page || 1;
+    const limit = +req.query?.limit || 10;
+    const search = req.query?.search || "";
 
     try {
       let query = {};
@@ -334,6 +336,13 @@ module.exports = {
         .limit(limit * 1)
         .skip((page - 1) * limit)
         .exec();
+
+      console.log({
+        totalResults: totalDealersCount,
+        totalPages: totalPages,
+        currentPage: parseInt(page),
+        dealers: allDealers?.length,
+      });
 
       res.status(httpStatus.OK).json({
         status: "success",
@@ -543,7 +552,7 @@ module.exports = {
     try {
       const { id } = req.params;
 
-      const user = await Dealer.findById(dealerId);
+      const user = await Dealer.findById(id);
 
       if (!user) {
         return res.status(httpStatus.BAD_REQUEST).json({
@@ -553,10 +562,9 @@ module.exports = {
       }
 
       await Dealer.findByIdAndDelete(id);
-
       await OTP.deleteMany({ number: user.phoneNumber });
 
-      res.status(httpStatus.NOT_FOUND).json({
+      res.status(httpStatus.OK).json({
         status: "success",
         msg: "Dealer deleted successfully",
       });

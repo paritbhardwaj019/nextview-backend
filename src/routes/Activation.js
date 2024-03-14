@@ -13,8 +13,8 @@ router
 router
   .route("/upload")
   .post(
-    upload.single("file"),
     authenticationMiddleware(["admin"]),
+    upload.single("file"),
     activationController.uploadActivations
   );
 
