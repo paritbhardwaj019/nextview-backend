@@ -25,6 +25,10 @@ const keySchema = new mongoose.Schema(
       enum: ["activated", "deactivated"],
       default: "deactivated",
     },
+    activation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Activation",
+    },
   },
   {
     timestamps: true,

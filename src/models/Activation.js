@@ -19,23 +19,24 @@ const activationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    dealerCode: {
-      type: String,
-      required: true,
-    },
     phone: {
       type: String,
       required: true,
     },
-    productName: {
-      type: String,
-    },
     purchasedOn: {
       type: String,
     },
-    status: {
+    expiresOn: {
       type: String,
-      enum: ["ACTIVATED", "DEACTIVATED"],
+    },
+    dealer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Dealer",
+    },
+    type: {
+      type: String,
+      enum: ["z+", "a+"],
+      required: true,
     },
   },
   {

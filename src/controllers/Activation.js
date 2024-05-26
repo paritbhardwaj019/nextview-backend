@@ -1,8 +1,8 @@
 const httpStatus = require("http-status");
-const { Activation } = require("../models");
-const excelReader = require("xlsx");
+const { Activation, Dealer, Key } = require("../models");
 const { nodeEnv } = require("../config");
 const fs = require("fs");
+const csv = require("fast-csv");
 
 module.exports = {
   fetchAllActivations: async (req, res) => {
@@ -54,6 +54,7 @@ module.exports = {
       const totalPages = Math.ceil(totalActivationsCount / limit);
 
       const allActivations = await Activation.find(query)
+        .populate("dealer")
         .limit(limit * 1)
         .skip((page - 1) * limit)
         .exec();
@@ -78,54 +79,70 @@ module.exports = {
   },
 
   uploadActivations: async (req, res) => {
+    if (!req.file.path) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        status: "fail",
+        msg: "File not added",
+      });
+    }
+
     try {
-      const file = excelReader.readFile(req.file.path);
-      const sheetNames = file.SheetNames;
-      const allData = [];
+      const activations = [];
+      const parseStream = fs
+        .createReadStream(req.file.path)
+        .pipe(csv.parse({ headers: true }));
 
-      for (let index = 0; index < sheetNames.length; index++) {
-        const sheetName = sheetNames[index];
-        const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
-
-        const formattedData = arr.map(
-          ({
-            LICENSE,
-            KEY,
-            NAME,
-            STATUS,
-            ["EMAIL ADDRESS"]: emailAdress,
-            ["DEALER CODE"]: dealerCode,
-            ["PHONE NUMBER"]: phoneNumber,
-            ["PRODUCT NAME"]: productName,
-            ["PURCHASED ON"]: purchasedOn,
-          }) => ({
-            licenseNo: LICENSE,
-            licenseKey: KEY,
-            name: NAME,
-            email: emailAdress,
-            dealerCode,
-            phone: phoneNumber,
-            productName,
-            purchasedOn,
-            status: STATUS,
-          })
-        );
-
-        allData.push(...formattedData);
+      for await (const data of parseStream) {
+        activations.push({
+          licenseNo: data["License"],
+          licenseKey: data["Key"],
+          name: data["Full Name"],
+          phone: data["Mobile Number"],
+          email: data["Email Address"],
+          type: (data["Product Type"] || "").split(" ")[0].toLowerCase(),
+          purchasedOn: data["Activated Date"],
+          expiresOn: data["Expires Date"],
+          dealerPhoneNumber: data["Dealer Phone Number"],
+        });
       }
 
-      await Activation.insertMany(allData);
-      await fs.unlink(req.file.path);
+      const dealerPhoneNumbers = activations
+        .map((a) => a.dealerPhoneNumber)
+        .filter(Boolean);
+      const dealers = await Dealer.find({
+        phoneNumber: { $in: dealerPhoneNumbers },
+      }).lean();
+
+      const dealerMap = dealers.reduce((map, dealer) => {
+        map[dealer.phoneNumber] = dealer._id;
+        return map;
+      }, {});
+
+      const newActivations = activations.map((activation) => ({
+        ...activation,
+        dealer: dealerMap[activation.dealerPhoneNumber],
+      }));
+
+      await Promise.all([
+        Activation.insertMany(newActivations),
+        Key.updateMany(
+          { license: { $in: activations.map((a) => a.licenseNo) } },
+          { $set: { status: "activated" } }
+        ),
+      ]);
+
+      fs.unlinkSync(req.file.path);
 
       res.status(httpStatus.CREATED).json({
         status: "success",
         msg: "Data inserted successfully",
       });
     } catch (error) {
-      console.error("Error processing Excel file:", error);
+      console.log(error);
+
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
-        msg: "Error processing Excel file",
+        msg: "Error processing CSV file",
         stack: nodeEnv === "dev" ? error.stack : {},
       });
     }
