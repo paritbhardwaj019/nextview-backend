@@ -48,10 +48,6 @@ const dealerSchema = new mongoose.Schema(
       enum: ["self", "dealer"],
       default: "self",
     },
-    dealer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Dealer",
-    },
     authType: {
       type: String,
       enum: ["password", "email", "phone"],

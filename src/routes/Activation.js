@@ -10,10 +10,12 @@ router
     authenticationMiddleware(["admin", "dealer"]),
     activationController.fetchAllActivations
   );
-router.route("/upload").post(
-  // authenticationMiddleware(["admin"]),
-  upload.single("file"),
-  activationController.uploadActivations
-);
+router
+  .route("/upload")
+  .post(
+    authenticationMiddleware(["admin"]),
+    upload.single("file"),
+    activationController.uploadActivations
+  );
 
 module.exports = router;

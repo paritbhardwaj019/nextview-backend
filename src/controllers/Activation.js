@@ -47,7 +47,7 @@ module.exports = {
       }
 
       if (role === "dealer") {
-        query.phoneNumber = req.authUser?.phoneNumber;
+        query.dealer = req.authUser?._id;
       }
 
       const totalActivationsCount = await Activation.countDocuments(query);
