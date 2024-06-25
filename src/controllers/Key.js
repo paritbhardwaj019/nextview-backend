@@ -85,41 +85,50 @@ module.exports = {
   },
 
   fetchAllKeys: async (req, res) => {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, status, search = "" } = req.query;
+
+    const currentPage = parseInt(page) || 1;
+    const itemsPerPage = parseInt(limit) || 10;
+    const searchQuery = search || "";
 
     try {
       let query = {};
 
-      if (search) {
+      if (searchQuery) {
         query = {
           $or: [
-            { license: { $regex: search, $options: "i" } },
-            { key: { $regex: search, $options: "i" } },
+            { license: { $regex: searchQuery, $options: "i" } },
+            { key: { $regex: searchQuery, $options: "i" } },
+            { subBoxNo: { $regex: searchQuery, $options: "i" } },
           ],
         };
       }
 
+      if (status) {
+        query.status = status;
+      }
+
       const totalKeysCount = await Key.countDocuments(query);
-      const totalPages = Math.ceil(totalKeysCount / limit);
+      const totalPages = Math.ceil(totalKeysCount / itemsPerPage);
 
-      const allKeys = await Key.find(query)
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .exec();
+      let allKeys;
 
-      console.log({
-        totalResults: totalKeysCount,
-        totalPages: totalPages,
-        currentPage: parseInt(page),
-      });
+      if (searchQuery) {
+        allKeys = await Key.find(query).exec();
+      } else {
+        allKeys = await Key.find(query)
+          .limit(itemsPerPage)
+          .skip((currentPage - 1) * itemsPerPage)
+          .exec();
+      }
 
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Fetched All Keys",
         data: {
           totalResults: totalKeysCount,
-          totalPages: totalPages,
-          currentPage: parseInt(page),
+          totalPages: searchQuery ? 1 : totalPages,
+          currentPage: searchQuery ? 1 : currentPage,
           keys: allKeys,
         },
       });

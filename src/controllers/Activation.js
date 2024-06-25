@@ -42,12 +42,16 @@ module.exports = {
         query.purchasedOn = { $lte: new Date(endDate) };
       }
 
-      if (status) {
-        query.status = { $regex: new RegExp(`^${status}$`, "i") };
-      }
-
       if (role === "dealer") {
         query.dealer = req.authUser?._id;
+      }
+
+      const currentDate = new Date();
+
+      if (status === "active") {
+        query.$expr = { $gte: [{ $toDate: "$expiresOn" }, currentDate] };
+      } else if (status === "expired") {
+        query.$expr = { $lt: [{ $toDate: "$expiresOn" }, currentDate] };
       }
 
       const totalActivationsCount = await Activation.countDocuments(query);

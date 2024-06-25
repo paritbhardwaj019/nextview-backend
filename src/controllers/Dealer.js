@@ -337,13 +337,6 @@ module.exports = {
         .skip((page - 1) * limit)
         .exec();
 
-      console.log({
-        totalResults: totalDealersCount,
-        totalPages: totalPages,
-        currentPage: parseInt(page),
-        dealers: allDealers?.length,
-      });
-
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Fetched All Dealers",

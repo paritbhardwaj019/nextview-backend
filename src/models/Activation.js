@@ -33,6 +33,10 @@ const activationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Dealer",
     },
+    status: {
+      type: String,
+      enum: ["active", "expired"],
+    },
     type: {
       type: String,
       enum: ["z+", "a+"],
