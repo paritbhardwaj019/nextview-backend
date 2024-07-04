@@ -251,6 +251,9 @@ module.exports = {
           email: user.email,
           otp: hashedOTP,
         });
+
+        console.log(otp);
+
         const htmlPart = await generateOTPEmail({
           otp,
           name: user?.ownerName,
@@ -398,8 +401,6 @@ module.exports = {
         data: newDealer,
       });
     } catch (error) {
-      console.log(error);
-
       if (error.name === "TokenExpiredError") {
         return res.status(401).json({
           status: "fail",
@@ -533,7 +534,6 @@ module.exports = {
         data: updatedDealer,
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",

@@ -32,6 +32,7 @@ const activationSchema = new mongoose.Schema(
     dealer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Dealer",
+      default: null,
     },
     status: {
       type: String,
@@ -39,8 +40,21 @@ const activationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["z+", "a+"],
       required: true,
+    },
+    isNFR: {
+      type: Boolean,
+      default: false,
+    },
+    city: {
+      type: String,
+    },
+    district: {
+      type: String,
+    },
+    pinCode: {
+      type: String,
+      default: null,
     },
   },
   {

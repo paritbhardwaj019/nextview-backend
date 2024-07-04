@@ -3,11 +3,11 @@ const { nodeEnv } = require("../config");
 const excelReader = require("xlsx");
 const { Activation, Key } = require("../models");
 const fs = require("fs");
+const extractKeyType = require("../utils/extractKeyType");
+const containsNFR = require("../utils/containsNFR");
 
 module.exports = {
   uploadKeys: async (req, res) => {
-    const { type } = req.body;
-
     try {
       const file = excelReader.readFile(req.file.path);
       const sheetNames = file.SheetNames;
@@ -18,24 +18,28 @@ module.exports = {
         const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
 
         arr.forEach(
-          ({ ["Sub Box No"]: subBoxNo, LICENSE: license, KEY: key }) => {
+          ({
+            ["sub_box_id"]: subBoxNo,
+            license,
+            key,
+            ["main_box_number"]: mainBoxNo,
+            ["product_type"]: type,
+          }) => {
             const index = bulkData.findIndex(
               (item) =>
-                item.subBoxNo === subBoxNo &&
-                item.license === license &&
+                item.subBoxNo === subBoxNo ||
+                item.license === license ||
                 item.key === key
             );
-
-            console.log("Sub box: ", subBoxNo);
-            console.log("key: ", key);
-            console.log("license: ", license);
 
             if (index === -1) {
               bulkData.push({
                 subBoxNo,
                 license,
                 key,
-                type,
+                type: extractKeyType(type),
+                mainBoxNo,
+                isNFR: containsNFR(type),
               });
             }
           }
@@ -45,6 +49,7 @@ module.exports = {
       const existingActivations = await Activation.find({
         licenseNo: { $in: bulkData.map((data) => data.license) },
       });
+
       const existingKeys = await Key.find({
         $or: [
           { license: { $in: bulkData.map((data) => data.license) } },
@@ -75,7 +80,6 @@ module.exports = {
         msg: "Data inserted successfully",
       });
     } catch (error) {
-      console.error("Error processing Excel file:", error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing Excel file",
@@ -85,7 +89,7 @@ module.exports = {
   },
 
   fetchAllKeys: async (req, res) => {
-    const { page = 1, limit = 10, status, search = "" } = req.query;
+    const { page = 1, limit = 10, status, search = "", type } = req.query;
 
     const currentPage = parseInt(page) || 1;
     const itemsPerPage = parseInt(limit) || 10;
@@ -106,6 +110,10 @@ module.exports = {
 
       if (status) {
         query.status = status;
+      }
+
+      if (type) {
+        query.type = type;
       }
 
       const totalKeysCount = await Key.countDocuments(query);

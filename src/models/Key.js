@@ -4,7 +4,10 @@ const keySchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["z+", "a+"],
+      required: true,
+    },
+    mainBoxNo: {
+      type: String,
       required: true,
     },
     subBoxNo: {
@@ -28,6 +31,10 @@ const keySchema = new mongoose.Schema(
     activation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Activation",
+    },
+    isNFR: {
+      type: Boolean,
+      default: false,
     },
   },
   {

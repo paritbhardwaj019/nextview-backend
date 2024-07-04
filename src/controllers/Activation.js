@@ -3,6 +3,10 @@ const { Activation, Dealer, Key } = require("../models");
 const { nodeEnv } = require("../config");
 const fs = require("fs");
 const csv = require("fast-csv");
+const extractKeyType = require("../utils/extractKeyType");
+const isValidPhoneNumber = require("../utils/isValidPhoneNumber");
+const isValidPincode = require("../utils/isValidPincode");
+const containsNFR = require("../utils/containsNFR");
 
 module.exports = {
   fetchAllActivations: async (req, res) => {
@@ -57,15 +61,19 @@ module.exports = {
       const totalActivationsCount = await Activation.countDocuments(query);
       const totalPages = Math.ceil(totalActivationsCount / limit);
 
-      const allActivations = await Activation.find(query)
-        .populate("dealer")
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .exec();
+      let activationQuery = Activation.find(query).populate("dealer");
+
+      if (!search) {
+        activationQuery = activationQuery
+          .limit(limit * 1)
+          .skip((page - 1) * limit);
+      }
+
+      const allActivations = await activationQuery.exec();
 
       res.status(httpStatus.OK).json({
         status: "success",
-        msg: "Fetched All Activation",
+        msg: "Fetched All Activations",
         data: {
           totalResults: totalActivationsCount,
           totalPages: totalPages,
@@ -97,22 +105,29 @@ module.exports = {
         .pipe(csv.parse({ headers: true }));
 
       for await (const data of parseStream) {
-        activations.push({
-          licenseNo: data["License"],
-          licenseKey: data["Key"],
-          name: data["Full Name"],
-          phone: data["Mobile Number"],
-          email: data["Email Address"],
-          type: (data["Product Type"] || "").split(" ")[0].toLowerCase(),
-          purchasedOn: data["Activated Date"],
-          expiresOn: data["Expires Date"],
-          dealerPhoneNumber: data["Dealer Phone Number"],
-        });
+        if (isValidPhoneNumber(data["Dealer Name"])) {
+          activations.push({
+            licenseNo: data["License"],
+            licenseKey: data["Key"],
+            name: data["customer Name"],
+            phone: data["customer Phone"],
+            email: data["Email"],
+            type: extractKeyType(data["Product Type"]),
+            purchasedOn: data["Activated "],
+            expiresOn: data["Expiration"],
+            dealerPhoneNumber: data["Dealer Name"],
+            city: data["City"],
+            district: data["District"],
+            pinCode: isValidPincode(data["PIN"]) ? data["PIN"] : null,
+            isNFR: containsNFR(data["Product Type"]),
+          });
+        }
       }
 
       const dealerPhoneNumbers = activations
         .map((a) => a.dealerPhoneNumber)
         .filter(Boolean);
+
       const dealers = await Dealer.find({
         phoneNumber: { $in: dealerPhoneNumbers },
       }).lean();
@@ -142,8 +157,6 @@ module.exports = {
         msg: "Data inserted successfully",
       });
     } catch (error) {
-      console.log(error);
-
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing CSV file",
