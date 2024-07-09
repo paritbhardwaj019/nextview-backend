@@ -16,6 +16,12 @@ module.exports = {
     const { authType } = req.query;
     const { phoneNumber, email } = req.body;
 
+    const address = JSON.parse(req.body.address);
+
+    delete req.body?.address;
+
+    req.body.address = address;
+
     delete req.body.isPhoneVerified;
     delete req.body.isEmailVerified;
     delete req.body.role;
@@ -38,6 +44,7 @@ module.exports = {
       }
 
       const isDealerAlreadyExists = await Dealer.findOne(query);
+
       const isWithGSTAlreadyExists = await Dealer.findOne({
         gstInNumber: req.body.gstInNumber,
       });
@@ -110,6 +117,7 @@ module.exports = {
         data: newDealer,
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",
@@ -244,6 +252,8 @@ module.exports = {
         specialChars: false,
       });
 
+      console.log("OTP", otp);
+
       const hashedOTP = await bcrypt.hash(otp, 10);
 
       if (user.authType === "email") {
@@ -294,6 +304,7 @@ module.exports = {
     const { phoneNumber } = req.query;
     try {
       const dealer = await Dealer.findOne({ phoneNumber });
+
       if (!dealer) {
         return res.status(httpStatus.BAD_REQUEST).json({
           status: "fail",
@@ -316,7 +327,7 @@ module.exports = {
   },
   fetchAllDealers: async (req, res) => {
     const page = +req.query?.page || 1;
-    const limit = +req.query?.limit || 10;
+    const limit = +req.query?.limit || 100;
     const search = req.query?.search || "";
 
     try {
@@ -335,17 +346,22 @@ module.exports = {
       const totalDealersCount = await Dealer.countDocuments(query);
       const totalPages = Math.ceil(totalDealersCount / limit);
 
-      const allDealers = await Dealer.find(query)
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .exec();
+      let dealerQuery = Dealer.find(query).sort({
+        createdAt: -1,
+      });
+
+      if (!search) {
+        dealerQuery = dealerQuery.limit(limit * 1).skip((page - 1) * limit);
+      }
+
+      const allDealers = await dealerQuery.exec();
 
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Fetched All Dealers",
         data: {
           totalResults: totalDealersCount,
-          totalPages: totalPages,
+          totalPages: search ? 1 : totalPages,
           currentPage: parseInt(page),
           dealers: allDealers,
         },
@@ -358,6 +374,7 @@ module.exports = {
       });
     }
   },
+
   verifyEmail: async (req, res) => {
     const { token } = req.body;
 
@@ -501,8 +518,6 @@ module.exports = {
   editDealerById: async (req, res) => {
     const { id } = req.params;
     delete req.body.authType;
-    delete req.body.isPhoneVerified;
-    delete req.body.isEmailVerified;
 
     try {
       const user = await Dealer.findById(id);
@@ -562,6 +577,7 @@ module.exports = {
         msg: "Dealer deleted successfully",
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",

@@ -56,6 +56,14 @@ const activationSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    dealerPhone: {
+      type: String,
+      trim: true,
+    },
+    key: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Key",
+    },
   },
   {
     timestamps: true,

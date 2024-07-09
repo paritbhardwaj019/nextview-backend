@@ -13,9 +13,10 @@ module.exports = async ({ name, link }) => {
   const email = {
     body: {
       name,
-      intro: "Welcome to NextView! We're very excited to have you on board.",
+      intro: " Welcome to NextView! We're thrilled to have you on board.",
       action: {
-        instructions: "To get started with NextView, Please click here:",
+        instructions:
+          "To get started with your account, please confirm your account by following the link below:",
         button: {
           color: "#d90a12",
           text: "Confirm your account",
@@ -23,7 +24,7 @@ module.exports = async ({ name, link }) => {
         },
       },
       outro:
-        "Need help, or have questions? Just reply to this email, we'd love to help.",
+        "If you need any help or have questions, just reply to this email. We're here to assist you.",
     },
   };
 

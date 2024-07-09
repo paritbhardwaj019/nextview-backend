@@ -6,11 +6,16 @@ dotenv.config({ path: path.join(__dirname, "../../", ".env") });
 module.exports = {
   port: process.env.PORT || "8080",
   dbUrl: process.env.DB_URL,
+  resendConfig: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.FROM_EMAIL,
+    fromName: process.env.FROM_NAME,
+  },
   mailJetConfig: {
     apiKey: process.env.MAILJET_API_KEY,
+    fromEmail: process.env.FROM_EMAIL,
+    fromName: process.env.FROM_NAME,
     apiSecret: process.env.MAILJET_API_SECRET,
-    fromMail: process.env.MAILJET_FROM_EMAIL,
-    fromName: process.env.MAILJET_FROM_NAME,
   },
   nodeEnv: process.env.NODE_ENV,
   jwtSecret: process.env.JWT_SECRET,
