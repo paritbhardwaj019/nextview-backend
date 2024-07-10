@@ -5,6 +5,12 @@ const otpController = require("../controllers/OTP");
 const upload = require("../utils/upload");
 const authenticationMiddleware = require("../middlewares/authenticationMiddleware");
 
+router.get(
+  "/all",
+  authenticationMiddleware(["admin"]),
+  dealerController.getAllDealers
+);
+
 router
   .route("/")
   .get(authenticationMiddleware("admin"), dealerController.fetchAllDealers);

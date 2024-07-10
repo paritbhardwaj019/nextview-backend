@@ -1,52 +1,98 @@
 const httpStatus = require("http-status");
-const Activation = require("../models/Activation");
+const { Activation } = require("../models");
 
 module.exports = {
-  getDashboardStats: async (req, res) => {
+  getAllDashboardData: async (req, res) => {
     try {
-      const user = req.authUser;
+      const date = new Date();
 
-      const now = new Date();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const previousMonthStart = new Date(
-        now.getFullYear(),
-        now.getMonth() - 1,
+      const firstDayOfCurrentMonth = new Date(
+        date.getFullYear(),
+        date.getMonth(),
         1
       );
-      const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
-      const activationsThisMonth = await Activation.countDocuments({
-        dealer: user._id,
+      const lastDayOfCurrentMonth = new Date(
+        date.getFullYear(),
+        date.getMonth() + 1,
+        0
+      );
+
+      const firstDayOfLastMonth = new Date(
+        date.getFullYear(),
+        date.getMonth() - 1,
+        1
+      );
+
+      const lastDayOfLastMonth = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        0
+      );
+
+      const dealerFilter =
+        req?.authUser?.role === "dealer" ? { dealer: req.authUser._id } : {};
+
+      const allActivationsOfThisMonth = await Activation.find({
+        ...dealerFilter,
         $expr: {
           $and: [
-            { $gte: [{ $toDate: "$purchasedOn" }, currentMonthStart] },
-            { $lt: [{ $toDate: "$purchasedOn" }, now] },
+            { $gte: [{ $toDate: "$purchasedOn" }, firstDayOfCurrentMonth] },
+            { $lt: [{ $toDate: "$purchasedOn" }, lastDayOfCurrentMonth] },
           ],
         },
       });
 
-      const activationsLastMonth = await Activation.countDocuments({
-        dealer: user._id,
+      const allActivationsOfLastMonth = await Activation.find({
+        ...dealerFilter,
         $expr: {
           $and: [
-            { $gte: [{ $toDate: "$purchasedOn" }, previousMonthStart] },
-            { $lt: [{ $toDate: "$purchasedOn" }, previousMonthEnd] },
+            { $gte: [{ $toDate: "$purchasedOn" }, firstDayOfLastMonth] },
+            { $lt: [{ $toDate: "$purchasedOn" }, lastDayOfLastMonth] },
           ],
         },
       });
 
-      const percentageIncrease =
-        activationsLastMonth === 0
-          ? activationsThisMonth > 0
-            ? 100
-            : 0
-          : ((activationsThisMonth - activationsLastMonth) /
-              activationsLastMonth) *
-            100;
+      const latestActivations = await Activation.find(dealerFilter)
+        .sort({ purchasedOn: -1 })
+        .limit(10);
 
-      res.json({
-        activationsThisMonth,
-        percentageIncrease: parseFloat(percentageIncrease).toFixed(2),
+      const thiryDaysAfterToday = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        30
+      );
+
+      const upcomingExpirationsInThirtyDays = await Activation.find({
+        ...dealerFilter,
+        $expr: {
+          $and: [
+            { $gte: [{ $toDate: "$expiresOn" }, date] },
+            { $lt: [{ $toDate: "$expiresOn" }, thiryDaysAfterToday] },
+          ],
+        },
+      });
+
+      const totalActivations = await Activation.find(dealerFilter);
+
+      const totalActivationsThisMonth = allActivationsOfThisMonth.length;
+      const totalActivationsLastMonth = allActivationsOfLastMonth.length;
+
+      const percentageBetweenLastMonthAndCurrentMonth =
+        ((totalActivationsThisMonth - totalActivationsLastMonth) /
+          totalActivationsLastMonth) *
+        100;
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          allActivationsOfThisMonth: totalActivationsThisMonth,
+          percentageBetweenLastMonthAndCurrentMonth,
+          latestActivations,
+          upcomingExpirationsInThirtyDays:
+            upcomingExpirationsInThirtyDays.length,
+          totalActivations: totalActivations?.length,
+        },
       });
     } catch (error) {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({

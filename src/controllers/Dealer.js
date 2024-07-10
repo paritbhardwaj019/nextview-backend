@@ -584,4 +584,26 @@ module.exports = {
       });
     }
   },
+  getAllDealers: async (_, res) => {
+    try {
+      const dealers = await Dealer.find();
+
+      if (dealers.length === 0) {
+        return res.status(httpStatus.NOT_FOUND).json({
+          status: "fail",
+          msg: "No dealers found",
+        });
+      }
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        data: dealers,
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message || "Something went wrong",
+      });
+    }
+  },
 };

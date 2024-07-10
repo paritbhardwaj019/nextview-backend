@@ -7,7 +7,7 @@ router
   .route("/stats")
   .get(
     authenticationMiddleware(["admin", "dealer"]),
-    dashboardController.getDashboardStats
+    dashboardController.getAllDashboardData
   );
 
 module.exports = router;

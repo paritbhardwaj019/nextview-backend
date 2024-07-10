@@ -115,7 +115,7 @@ module.exports = {
             phone: data["customer Phone"],
             email: data["Email"],
             type: extractKeyType(data["Product Type"]),
-            purchasedOn: data["Activated "],
+            purchasedOn: data["Activated"],
             expiresOn: data["Expiration"],
             dealerPhoneNumber: data["Dealer Name"],
             dealerPhone: data["Dealer Name"],
@@ -141,6 +141,12 @@ module.exports = {
       }, {});
 
       const licenseNumbers = activations.map((a) => a.licenseNo);
+      const existingActivations = await Activation.find({
+        licenseNo: { $in: licenseNumbers },
+      }).lean();
+
+      const existingKeys = existingActivations.map((a) => a.licenseNo);
+
       const keys = await Key.find({
         license: { $in: licenseNumbers },
       }).lean();
@@ -150,11 +156,13 @@ module.exports = {
         return map;
       }, {});
 
-      const newActivations = activations.map((activation) => ({
-        ...activation,
-        dealer: dealerMap[activation.dealerPhoneNumber],
-        key: keyMap[activation.licenseNo],
-      }));
+      const newActivations = activations
+        .filter((activation) => !existingKeys.includes(activation.licenseNo))
+        .map((activation) => ({
+          ...activation,
+          dealer: dealerMap[activation.dealerPhoneNumber],
+          key: keyMap[activation.licenseNo],
+        }));
 
       await Promise.all([
         Activation.insertMany(newActivations),
@@ -171,6 +179,7 @@ module.exports = {
         msg: "Data inserted successfully",
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing CSV file",
