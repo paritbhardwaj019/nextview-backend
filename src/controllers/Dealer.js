@@ -10,6 +10,7 @@ const otpGenerator = require("otp-generator");
 const sendMail = require("../utils/sendMail");
 const uploadImageToCloudinary = require("../utils/uploadImageToCloudinary");
 const generateWelcomeMail = require("../mail/generateWelcomeMail");
+const fs = require("fs");
 
 module.exports = {
   signUpDealer: async (req, res) => {
@@ -45,15 +46,17 @@ module.exports = {
 
       const isDealerAlreadyExists = await Dealer.findOne(query);
 
-      const isWithGSTAlreadyExists = await Dealer.findOne({
-        gstInNumber: req.body.gstInNumber,
-      });
-
-      if (isWithGSTAlreadyExists) {
-        return res.status(httpStatus.BAD_REQUEST).json({
-          status: "fail",
-          msg: "User with GSTIN Number already exists.",
+      if (req.body.accountType !== "partner") {
+        const isWithGSTAlreadyExists = await Dealer.findOne({
+          gstInNumber: req.body.gstInNumber,
         });
+
+        if (isWithGSTAlreadyExists) {
+          return res.status(httpStatus.BAD_REQUEST).json({
+            status: "fail",
+            msg: "User with GSTIN Number already exists.",
+          });
+        }
       }
 
       if (isDealerAlreadyExists) {
@@ -78,6 +81,7 @@ module.exports = {
       if (req?.file && req?.file?.fieldname === "panPhoto") {
         const { secure_url } = await uploadImageToCloudinary(req.file.path);
         panPhoto = secure_url;
+        await fs.unlinkSync(req.file.path);
       }
 
       const newDealer = await Dealer.create({

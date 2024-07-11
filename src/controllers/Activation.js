@@ -187,4 +187,63 @@ module.exports = {
       });
     }
   },
+  editActivationById: async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const updatedActivation = await Activation.findByIdAndUpdate(
+        id,
+        { ...req.body },
+        {
+          new: true,
+        }
+      );
+
+      if (!updatedActivation) {
+        return res.status(httpStatus.NOT_FOUND).json({
+          status: "fail",
+          msg: "Activation not found",
+        });
+      }
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "Activation updated successfully",
+        data: updatedActivation,
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: "Error updating activation",
+        stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
+
+  deleteActivationById: async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const deletedActivation = await Activation.findByIdAndDelete(id);
+
+      if (!deletedActivation) {
+        return res.status(httpStatus.NOT_FOUND).json({
+          status: "fail",
+          msg: "Activation not found",
+        });
+      }
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        msg: "Activation deleted successfully",
+        data: deletedActivation,
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: "Error deleting activation",
+        stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
 };
