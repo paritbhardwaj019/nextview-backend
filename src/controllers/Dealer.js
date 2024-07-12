@@ -256,8 +256,6 @@ module.exports = {
         specialChars: false,
       });
 
-      console.log("OTP", otp);
-
       const hashedOTP = await bcrypt.hash(otp, 10);
 
       if (user.authType === "email") {
@@ -265,8 +263,6 @@ module.exports = {
           email: user.email,
           otp: hashedOTP,
         });
-
-        console.log(otp);
 
         const htmlPart = await generateOTPEmail({
           otp,

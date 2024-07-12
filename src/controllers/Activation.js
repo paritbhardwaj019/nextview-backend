@@ -187,16 +187,28 @@ module.exports = {
       });
     }
   },
+
   editActivationById: async (req, res) => {
     const { id } = req.params;
+    const { dealerPhone, ...rest } = req.body;
+
+    delete req.body?._id;
 
     try {
+      let dealerId = null;
+
+      if (dealerPhone) {
+        const dealer = await Dealer.findOne({ phoneNumber: dealerPhone });
+
+        if (dealer) {
+          dealerId = dealer._id;
+        }
+      }
+
       const updatedActivation = await Activation.findByIdAndUpdate(
         id,
-        { ...req.body },
-        {
-          new: true,
-        }
+        { ...rest, dealerPhone, dealer: dealerId },
+        { new: true }
       );
 
       if (!updatedActivation) {
@@ -212,10 +224,11 @@ module.exports = {
         data: updatedActivation,
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error updating activation",
-        stack: nodeEnv === "dev" ? error.stack : {},
+        stack: process.env.NODE_ENV === "dev" ? error.stack : {},
       });
     }
   },

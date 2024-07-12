@@ -35,7 +35,6 @@ const sendOtpViaFast2Sms = ({ phoneNumber }) => {
           reject(new Error(response.error));
         } else {
           resolve(response.body);
-          console.log(response.body);
         }
       });
       resolve("OK");

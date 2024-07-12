@@ -10,6 +10,18 @@ router
     authenticationMiddleware(["admin", "dealer"]),
     activationController.fetchAllActivations
   );
+
+router
+  .route("/:id")
+  .put(
+    authenticationMiddleware(["admin"]),
+    activationController.editActivationById
+  )
+  .delete(
+    authenticationMiddleware(["admin"]),
+    activationController.deleteActivationById
+  );
+
 router
   .route("/upload")
   .post(
