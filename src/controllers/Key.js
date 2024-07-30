@@ -73,7 +73,7 @@ module.exports = {
         await Key.insertMany(filteredData);
       }
 
-      await fs.unlinkSync(req.file.path);
+      fs.unlinkSync(req.file.path);
 
       res.status(httpStatus.CREATED).json({
         status: "success",
@@ -149,28 +149,30 @@ module.exports = {
     }
   },
 
-  deleteKey: async (req, res) => {
+  deleteKeyById: async (req, res) => {
     const { id } = req.params;
+
     try {
-      const key = await Key.findById(id);
-      if (!key) {
+      const deletedKey = await Key.findByIdAndDelete(id);
+
+      await Activation.deleteMany({ _id: deletedKey.license });
+
+      if (!deletedKey) {
         return res.status(httpStatus.NOT_FOUND).json({
           status: "fail",
           msg: "Key not found",
         });
       }
 
-      await Key.deleteOne({ _id: id });
-
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Key deleted successfully",
+        data: deletedKey,
       });
     } catch (error) {
-      console.error("Error deleting key:", error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
-        msg: "Error deleting key",
+        msg: "Error deleting activation",
         stack: nodeEnv === "dev" ? error.stack : {},
       });
     }

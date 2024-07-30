@@ -17,61 +17,96 @@ module.exports = {
       startDate = "",
       endDate = "",
       status = "",
+      type = null,
     } = req.query;
 
     const { role } = req.authUser;
 
     try {
-      let query = {};
+      let match = {};
 
       if (search) {
-        query = {
-          $or: [
-            { licenseKey: { $regex: search, $options: "i" } },
-            { licenseNo: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } },
-            { name: { $in: [new RegExp(search, "i")] } },
-            { phone: { $in: [new RegExp(search, "i")] } },
-            { dealerPhone: { $in: [new RegExp(search, "i")] } },
-          ],
-        };
-      }
-
-      if (startDate && endDate) {
-        query.purchasedOn = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
-        };
-      } else if (startDate) {
-        query.purchasedOn = { $gte: new Date(startDate) };
-      } else if (endDate) {
-        query.purchasedOn = { $lte: new Date(endDate) };
+        match.$or = [
+          { licenseKey: { $regex: search, $options: "i" } },
+          { licenseNo: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { name: { $in: [new RegExp(search, "i")] } },
+          { phone: { $in: [new RegExp(search, "i")] } },
+          { dealerPhone: { $in: [new RegExp(search, "i")] } },
+          { "keyDetails.subBoxNo": { $regex: search, $options: "i" } },
+          { "keyDetails.mainBoxNo": { $regex: search, $options: "i" } },
+        ];
       }
 
       if (role === "dealer") {
-        query.dealer = req.authUser?._id;
+        match.dealer = req.authUser?._id;
+      }
+
+      if (type) {
+        match.type = type;
       }
 
       const currentDate = new Date();
 
       if (status === "active") {
-        query.$expr = { $gte: [{ $toDate: "$expiresOn" }, currentDate] };
+        match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
       } else if (status === "expired") {
-        query.$expr = { $lt: [{ $toDate: "$expiresOn" }, currentDate] };
+        match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
       }
 
-      const totalActivationsCount = await Activation.countDocuments(query);
-      const totalPages = Math.ceil(totalActivationsCount / limit);
-
-      let activationQuery = Activation.find(query).populate("dealer key");
+      let aggregation = [
+        {
+          $lookup: {
+            from: "keys",
+            localField: "key",
+            foreignField: "_id",
+            as: "keyDetails",
+          },
+        },
+        { $unwind: "$keyDetails" },
+        {
+          $project: {
+            _id: 1,
+            licenseKey: 1,
+            licenseNo: 1,
+            name: 1,
+            email: 1,
+            phone: 1,
+            dealerPhone: 1,
+            purchasedOn: 1,
+            expiresOn: 1,
+            status: 1,
+            dealer: 1,
+            type: 1,
+            isNFR: 1,
+            city: 1,
+            district: 1,
+            pinCode: 1,
+            "keyDetails.subBoxNo": 1,
+            "keyDetails.mainBoxNo": 1,
+            "keyDetails.isNFR": 1,
+          },
+        },
+        {
+          $match: match,
+        },
+        { $sort: { purchasedOn: -1 } },
+      ];
 
       if (!search) {
-        activationQuery = activationQuery
-          .limit(limit * 1)
-          .skip((page - 1) * limit);
+        aggregation = [
+          ...aggregation,
+          { $skip: (page - 1) * +limit },
+          { $limit: +limit },
+        ];
       }
 
-      const allActivations = await activationQuery.exec();
+      const [totalActivationsCount, allActivations] = await Promise.all([
+        Activation.countDocuments(match),
+        Activation.aggregate(aggregation),
+      ]);
+
+      const totalPages = Math.ceil(totalActivationsCount / limit);
 
       res.status(httpStatus.OK).json({
         status: "success",
@@ -172,7 +207,7 @@ module.exports = {
         ),
       ]);
 
-      await fs.unlinkSync(req.file.path);
+      fs.unlinkSync(req.file.path);
 
       res.status(httpStatus.CREATED).json({
         status: "success",
@@ -239,6 +274,15 @@ module.exports = {
     try {
       const deletedActivation = await Activation.findByIdAndDelete(id);
 
+      await Key.updateOne(
+        { _id: deletedActivation.key },
+        {
+          $set: {
+            status: "deactivated",
+          },
+        }
+      );
+
       if (!deletedActivation) {
         return res.status(httpStatus.NOT_FOUND).json({
           status: "fail",
@@ -255,6 +299,34 @@ module.exports = {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error deleting activation",
+        stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
+
+  getActivationsByDealerId: async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const activations = await Activation.find({
+        dealerPhone: id,
+      });
+
+      if (!activations) {
+        return res.status(httpStatus.NOT_FOUND).json({
+          status: "fail",
+          msg: "No activations found for the provided dealer id",
+        });
+      }
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        data: activations,
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: "Error fetching activations",
         stack: nodeEnv === "dev" ? error.stack : {},
       });
     }

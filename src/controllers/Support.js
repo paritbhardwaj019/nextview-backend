@@ -89,10 +89,37 @@ const markAsResolved = async (req, res) => {
   }
 };
 
+const deleteSupportRequestById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const deletedSupportRequest = await Support.findByIdAndDelete(id);
+
+    if (!deletedSupportRequest) {
+      return res.status(httpStatus.NOT_FOUND).json({
+        status: "fail",
+        msg: "Support request not found",
+      });
+    }
+
+    res.status(httpStatus.OK).json({
+      status: "success",
+      msg: "Support deleted successfully",
+      data: deletedSupportRequest,
+    });
+  } catch (error) {
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+      status: "fail",
+      msg: error.message || "Something went wrong",
+      stack: process.env.NODE_ENV === "development" ? error.stack : {},
+    });
+  }
+};
+
 const supportController = {
   createSupportRequest,
   getAllSupportRequests,
   markAsResolved,
+  deleteSupportRequestById,
 };
 
 module.exports = supportController;

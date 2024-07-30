@@ -20,4 +20,11 @@ router
     supportController.getAllSupportRequests
   );
 
+router
+  .route("/:id")
+  .delete(
+    authenticationMiddleware(["admin"]),
+    supportController.deleteSupportRequestById
+  );
+
 module.exports = router;

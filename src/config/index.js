@@ -11,12 +11,6 @@ module.exports = {
     fromEmail: process.env.FROM_EMAIL,
     fromName: process.env.FROM_NAME,
   },
-  mailJetConfig: {
-    apiKey: process.env.MAILJET_API_KEY,
-    fromEmail: process.env.FROM_EMAIL,
-    fromName: process.env.FROM_NAME,
-    apiSecret: process.env.MAILJET_API_SECRET,
-  },
   nodeEnv: process.env.NODE_ENV,
   jwtSecret: process.env.JWT_SECRET,
   frontendUrl: process.env.FRONTEND_URL,

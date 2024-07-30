@@ -17,6 +17,6 @@ router
 
 router
   .route("/:id")
-  .delete(authenticationMiddleware(["admin"]), keyController.deleteKey);
+  .delete(authenticationMiddleware(["admin"]), keyController.deleteKeyById);
 
 module.exports = router;

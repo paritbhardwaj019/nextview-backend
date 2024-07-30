@@ -20,6 +20,10 @@ router
   .delete(
     authenticationMiddleware(["admin"]),
     activationController.deleteActivationById
+  )
+  .get(
+    authenticationMiddleware(["admin"]),
+    activationController.getActivationsByDealerId
   );
 
 router

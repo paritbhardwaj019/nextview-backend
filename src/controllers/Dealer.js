@@ -210,7 +210,7 @@ module.exports = {
       delete user.password;
 
       const token = jwt.sign({ user }, jwtSecret, {
-        expiresIn: "1h",
+        expiresIn: "24h",
       });
 
       await OTP.deleteMany({
@@ -605,5 +605,30 @@ module.exports = {
         msg: error.message || "Something went wrong",
       });
     }
+  },
+
+  updateProfile: async (req, res) => {
+    const user = req.authUser;
+    try {
+      const files = req.files;
+
+      if (files?.profilePic?.length > 0) {
+        const { path } = files.profilePic?.at(0);
+        const { secure_url } = await uploadImageToCloudinary(path);
+
+        const updatedDealer = await Dealer.findByIdAndUpdate(user?._id, {
+          profilePic: secure_url,
+        }).select("profilePic");
+
+        fs.unlinkSync(path);
+
+        return res.status(httpStatus.OK).send({
+          message: "Dealer updated successfully",
+          data: {
+            dealer: updatedDealer,
+          },
+        });
+      }
+    } catch (error) {}
   },
 };

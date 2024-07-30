@@ -11,6 +11,13 @@ router.get(
   dealerController.getAllDealers
 );
 
+router.put(
+  "/update-profile",
+  authenticationMiddleware(["dealer"]),
+  upload.fields([{ name: "profilePic", maxCount: 1 }]),
+  dealerController.updateProfile
+);
+
 router
   .route("/")
   .get(authenticationMiddleware("admin"), dealerController.fetchAllDealers);
