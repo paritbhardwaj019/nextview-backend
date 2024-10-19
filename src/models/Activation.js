@@ -24,7 +24,7 @@ const activationSchema = new mongoose.Schema(
       required: true,
     },
     purchasedOn: {
-      type: String,
+      type: Date,
     },
     expiresOn: {
       type: String,

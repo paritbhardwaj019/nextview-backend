@@ -54,6 +54,14 @@ module.exports = {
         match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
       }
 
+      if (startDate) {
+        match.purchasedOn = { $gte: new Date(startDate) };
+      }
+
+      if (endDate) {
+        match.purchasedOn = { ...match.purchasedOn, $lte: new Date(endDate) };
+      }
+
       let aggregation = [
         {
           $lookup: {
