@@ -8,7 +8,156 @@ const isValidPhoneNumber = require("../utils/isValidPhoneNumber");
 const isValidPincode = require("../utils/isValidPincode");
 const containsNFR = require("../utils/containsNFR");
 
+var mongoose = require("mongoose");
+
+var ObjectId = mongoose.Types.ObjectId;
+
 module.exports = {
+  // fetchAllActivations: async (req, res) => {
+  //   const {
+  //     page = 1,
+  //     limit = 10,
+  //     search = "",
+  //     startDate = "",
+  //     endDate = "",
+  //     status = "",
+  //     type = null,
+  //   } = req.query;
+
+  //   const { role } = req.authUser;
+
+  //   try {
+  //     let match = {};
+
+  // if (search) {
+  //   match.$or = [
+  //     { licenseKey: { $regex: search, $options: "i" } },
+  //     { licenseNo: { $regex: search, $options: "i" } },
+  //     { email: { $regex: search, $options: "i" } },
+  //     { name: { $in: [new RegExp(search, "i")] } },
+  //     { phone: { $in: [new RegExp(search, "i")] } },
+  //     { dealerPhone: { $in: [new RegExp(search, "i")] } },
+  //     { "keyDetails.subBoxNo": { $regex: search, $options: "i" } },
+  //     { "keyDetails.mainBoxNo": { $regex: search, $options: "i" } },
+  //   ];
+  // }
+
+  //     if (role === "dealer") {
+  //       if (ObjectId.isValid(req.authUser?._id)) {
+  //         match.dealer = new ObjectId(req.authUser._id);
+  //       } else {
+  //         return res.status(httpStatus.BAD_REQUEST).json({
+  //           status: "fail",
+  //           msg: "Invalid dealer ID.",
+  //         });
+  //       }
+  //     }
+
+  //     if (type) {
+  //       match.type = type;
+  //     }
+
+  //     const currentDate = new Date();
+
+  //     if (status === "active") {
+  //       match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
+  //     } else if (status === "expired") {
+  //       match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
+  //     }
+
+  //     if (startDate) {
+  //       match.purchasedOn = { $gte: new Date(startDate) };
+  //     }
+
+  //     if (endDate) {
+  //       match.purchasedOn = { ...match.purchasedOn, $lte: new Date(endDate) };
+  //     }
+
+  //     let aggregation = [
+  //       {
+  //         $lookup: {
+  //           from: "keys", // Collection name for keys
+  //           localField: "key",
+  //           foreignField: "_id",
+  //           as: "keyDetails",
+  //         },
+  //       },
+  //       { $unwind: "$keyDetails" },
+  //       {
+  //         $lookup: {
+  //           from: "dealers", // Collection name for dealers
+  //           localField: "dealer",
+  //           foreignField: "_id",
+  //           as: "dealerDetails",
+  //         },
+  //       },
+  //       { $unwind: "$dealerDetails" }, // Unwind to convert dealerDetails array to object
+  //       {
+  //         $project: {
+  //           _id: 1,
+  //           licenseKey: 1,
+  //           licenseNo: 1,
+  //           name: 1,
+  //           email: 1,
+  //           phone: 1,
+  //           dealerPhone: 1,
+  //           purchasedOn: 1,
+  //           expiresOn: 1,
+  //           status: 1,
+  //           dealer: "$dealerDetails", // Replace dealer ObjectId with dealerDetails object
+  //           type: 1,
+  //           isNFR: 1,
+  //           city: 1,
+  //           district: 1,
+  //           pinCode: 1,
+  //           "keyDetails.subBoxNo": 1,
+  //           "keyDetails.mainBoxNo": 1,
+  //           "keyDetails.isNFR": 1,
+  //         },
+  //       },
+  //       {
+  //         $match: match,
+  //       },
+  //       { $sort: { purchasedOn: -1 } },
+  //     ];
+
+  //     console.log("MATCH", match);
+
+  //     if (!search) {
+  //       aggregation = [
+  //         ...aggregation,
+  //         { $skip: (page - 1) * +limit },
+  //         { $limit: +limit },
+  //       ];
+  //     }
+
+  //     const [totalActivationsCount, allActivations] = await Promise.all([
+  //       Activation.countDocuments(match),
+  //       Activation.aggregate(aggregation),
+  //     ]);
+
+  //     const totalPages = Math.ceil(totalActivationsCount / limit);
+
+  //     res.status(httpStatus.OK).json({
+  //       status: "success",
+  //       msg: "Fetched All Activations",
+  //       data: {
+  //         totalResults: totalActivationsCount,
+  //         totalPages: totalPages,
+  //         currentPage: parseInt(page),
+  //         activations: allActivations,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     console.log(error);
+  //     res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+  //       status: "fail",
+  //       msg: error.message || "Something went wrong",
+  //       stack: nodeEnv === "dev" ? error.stack : {},
+  //     });
+  //   }
+  // },
+
   fetchAllActivations: async (req, res) => {
     const {
       page = 1,
@@ -21,6 +170,8 @@ module.exports = {
     } = req.query;
 
     const { role } = req.authUser;
+
+    console.log("SEARCH", search);
 
     try {
       let match = {};
@@ -39,14 +190,19 @@ module.exports = {
       }
 
       if (role === "dealer") {
-        match.dealer = req.authUser?._id;
+        if (ObjectId.isValid(req.authUser?._id)) {
+          match.dealer = new ObjectId(req.authUser._id);
+        } else {
+          return res.status(httpStatus.BAD_REQUEST).json({
+            status: "fail",
+            msg: "Invalid dealer ID.",
+          });
+        }
       }
 
       if (type) {
         match.type = type;
       }
-
-      const currentDate = new Date();
 
       if (status === "active") {
         match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
@@ -73,42 +229,28 @@ module.exports = {
         },
         { $unwind: "$keyDetails" },
         {
-          $project: {
-            _id: 1,
-            licenseKey: 1,
-            licenseNo: 1,
-            name: 1,
-            email: 1,
-            phone: 1,
-            dealerPhone: 1,
-            purchasedOn: 1,
-            expiresOn: 1,
-            status: 1,
-            dealer: 1,
-            type: 1,
-            isNFR: 1,
-            city: 1,
-            district: 1,
-            pinCode: 1,
-            "keyDetails.subBoxNo": 1,
-            "keyDetails.mainBoxNo": 1,
-            "keyDetails.isNFR": 1,
+          $lookup: {
+            from: "dealers",
+            localField: "dealer",
+            foreignField: "_id",
+            as: "dealerDetails",
           },
         },
+        { $unwind: "$dealerDetails" },
         {
           $match: match,
         },
         { $sort: { purchasedOn: -1 } },
       ];
 
+      // Apply Pagination if no search is performed
       if (!search) {
-        aggregation = [
-          ...aggregation,
-          { $skip: (page - 1) * +limit },
-          { $limit: +limit },
-        ];
+        aggregation.push({ $skip: (page - 1) * +limit }, { $limit: +limit });
       }
 
+      console.log("AGGREGATION", aggregation);
+
+      // Execute Aggregation and Count in Parallel
       const [totalActivationsCount, allActivations] = await Promise.all([
         Activation.countDocuments(match),
         Activation.aggregate(aggregation),
@@ -127,14 +269,14 @@ module.exports = {
         },
       });
     } catch (error) {
+      console.error("Error fetching activations:", error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
-        msg: error.message || "Something went wrong",
-        stack: nodeEnv === "dev" ? error.stack : {},
+        msg: "An unexpected error occurred while fetching activations.",
+        stack: process.env.NODE_ENV === "dev" ? error.stack : {},
       });
     }
   },
-
   uploadActivations: async (req, res) => {
     if (!req.file.path) {
       return res.status(httpStatus.NOT_FOUND).json({
