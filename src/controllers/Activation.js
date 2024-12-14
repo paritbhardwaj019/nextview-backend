@@ -231,22 +231,8 @@ module.exports = {
         {
           $lookup: {
             from: "dealers",
-            let: { dealerId: "$dealer" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $eq: ["$_id", "$$dealerId"],
-                  },
-                },
-              },
-              {
-                $project: {
-                  name: 1,
-                  phone: 1,
-                },
-              },
-            ],
+            localField: "dealer",
+            foreignField: "_id",
             as: "dealerDetails",
           },
         },
@@ -255,7 +241,21 @@ module.exports = {
             dealerDetails: {
               $cond: {
                 if: { $eq: [{ $size: "$dealerDetails" }, 0] },
-                then: [{ name: null, phone: null }],
+                then: [
+                  {
+                    _id: null,
+                    name: null,
+                    phone: null,
+                    email: null,
+                    address: null,
+                    city: null,
+                    district: null,
+                    state: null,
+                    pinCode: null,
+                    isActive: null,
+                    isApproved: null,
+                  },
+                ],
                 else: "$dealerDetails",
               },
             },
@@ -263,7 +263,42 @@ module.exports = {
         },
         { $unwind: "$dealerDetails" },
         { $match: match },
-
+        {
+          $project: {
+            _id: 1,
+            licenseNo: 1,
+            licenseKey: 1,
+            name: 1,
+            email: 1,
+            phone: 1,
+            purchasedOn: 1,
+            expiresOn: 1,
+            dealer: 1,
+            type: 1,
+            isNFR: 1,
+            city: 1,
+            district: 1,
+            pinCode: 1,
+            dealerPhone: 1,
+            key: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            keyDetails: 1,
+            dealerDetails: {
+              _id: "$dealerDetails._id",
+              name: "$dealerDetails.name",
+              phone: "$dealerDetails.phone",
+              email: "$dealerDetails.email",
+              address: "$dealerDetails.address",
+              city: "$dealerDetails.city",
+              district: "$dealerDetails.district",
+              state: "$dealerDetails.state",
+              pinCode: "$dealerDetails.pinCode",
+              isActive: "$dealerDetails.isActive",
+              isApproved: "$dealerDetails.isApproved",
+            },
+          },
+        },
         {
           $facet: {
             metadata: [{ $count: "totalActivationsCount" }],
