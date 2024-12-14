@@ -74,6 +74,10 @@ const dealerSchema = new mongoose.Schema(
     profilePic: {
       type: String,
     },
+    dateOfBirth: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

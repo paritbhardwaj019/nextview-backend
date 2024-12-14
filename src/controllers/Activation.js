@@ -7,8 +7,10 @@ const extractKeyType = require("../utils/extractKeyType");
 const isValidPhoneNumber = require("../utils/isValidPhoneNumber");
 const isValidPincode = require("../utils/isValidPincode");
 const containsNFR = require("../utils/containsNFR");
+const { parse, isBefore, isAfter, startOfDay, format } = require("date-fns");
 
 var mongoose = require("mongoose");
+const { parseExpiryDate } = require("../utils/parseExpiryDate");
 
 var ObjectId = mongoose.Types.ObjectId;
 
@@ -57,13 +59,13 @@ module.exports = {
   //       match.type = type;
   //     }
 
-  //     const currentDate = new Date();
+  // const currentDate = new Date();
 
-  //     if (status === "active") {
-  //       match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
-  //     } else if (status === "expired") {
-  //       match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
-  //     }
+  // if (status === "active") {
+  //   match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
+  // } else if (status === "expired") {
+  //   match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
+  // }
 
   //     if (startDate) {
   //       match.purchasedOn = { $gte: new Date(startDate) };
@@ -157,7 +159,6 @@ module.exports = {
   //     });
   //   }
   // },
-
   fetchAllActivations: async (req, res) => {
     const {
       page = 1,
@@ -169,56 +170,55 @@ module.exports = {
       type = null,
     } = req.query;
 
-    const { role } = req.authUser;
-
-    console.log("SEARCH", search);
+    const { role, _id: authUserId } = req.authUser;
 
     try {
-      let match = {};
+      const match = {};
 
       if (search) {
+        const searchRegex = new RegExp(
+          search.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"),
+          "i"
+        );
         match.$or = [
-          { licenseKey: { $regex: search, $options: "i" } },
-          { licenseNo: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { name: { $in: [new RegExp(search, "i")] } },
-          { phone: { $in: [new RegExp(search, "i")] } },
-          { dealerPhone: { $in: [new RegExp(search, "i")] } },
-          { "keyDetails.subBoxNo": { $regex: search, $options: "i" } },
-          { "keyDetails.mainBoxNo": { $regex: search, $options: "i" } },
+          { licenseKey: searchRegex },
+          { licenseNo: searchRegex },
+          { email: searchRegex },
+          { name: searchRegex },
+          { phone: searchRegex },
+          { dealerPhone: searchRegex },
+          { "keyDetails.subBoxNo": searchRegex },
+          { "keyDetails.mainBoxNo": searchRegex },
         ];
       }
 
       if (role === "dealer") {
-        if (ObjectId.isValid(req.authUser?._id)) {
-          match.dealer = new ObjectId(req.authUser._id);
-        } else {
+        if (!ObjectId.isValid(authUserId)) {
           return res.status(httpStatus.BAD_REQUEST).json({
             status: "fail",
             msg: "Invalid dealer ID.",
           });
         }
+        match.dealer = new ObjectId(authUserId);
       }
 
       if (type) {
         match.type = type;
       }
 
-      if (status === "active") {
-        match.expiresOn = { $gte: { $toDate: "$expiresOn" }, currentDate };
-      } else if (status === "expired") {
-        match.expiresOn = { $lt: { $toDate: "$expiresOn" }, currentDate };
+      if (status) {
+        const currentDate = new Date();
+        match.expiresOn =
+          status === "active" ? { $gte: currentDate } : { $lt: currentDate };
       }
 
-      if (startDate) {
-        match.purchasedOn = { $gte: new Date(startDate) };
+      if (startDate || endDate) {
+        match.purchasedOn = {};
+        if (startDate) match.purchasedOn.$gte = new Date(startDate);
+        if (endDate) match.purchasedOn.$lte = new Date(endDate);
       }
 
-      if (endDate) {
-        match.purchasedOn = { ...match.purchasedOn, $lte: new Date(endDate) };
-      }
-
-      let aggregation = [
+      const aggregationPipeline = [
         {
           $lookup: {
             from: "keys",
@@ -231,52 +231,77 @@ module.exports = {
         {
           $lookup: {
             from: "dealers",
-            localField: "dealer",
-            foreignField: "_id",
+            let: { dealerId: "$dealer" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$_id", "$$dealerId"],
+                  },
+                },
+              },
+              {
+                $project: {
+                  name: 1,
+                  phone: 1,
+                },
+              },
+            ],
             as: "dealerDetails",
           },
         },
-        { $unwind: "$dealerDetails" },
         {
-          $match: match,
+          $addFields: {
+            dealerDetails: {
+              $cond: {
+                if: { $eq: [{ $size: "$dealerDetails" }, 0] },
+                then: [{ name: null, phone: null }],
+                else: "$dealerDetails",
+              },
+            },
+          },
         },
-        { $sort: { purchasedOn: -1 } },
+        { $unwind: "$dealerDetails" },
+        { $match: match },
+
+        {
+          $facet: {
+            metadata: [{ $count: "totalActivationsCount" }],
+            activations: [
+              { $sort: { purchasedOn: -1 } },
+              { $skip: (parseInt(page) - 1) * parseInt(limit) },
+              { $limit: parseInt(limit) },
+            ],
+          },
+        },
       ];
 
-      // Apply Pagination if no search is performed
-      if (!search) {
-        aggregation.push({ $skip: (page - 1) * +limit }, { $limit: +limit });
-      }
+      const [result] = await Activation.aggregate(aggregationPipeline);
 
-      console.log("AGGREGATION", aggregation);
-
-      // Execute Aggregation and Count in Parallel
-      const [totalActivationsCount, allActivations] = await Promise.all([
-        Activation.countDocuments(match),
-        Activation.aggregate(aggregation),
-      ]);
-
-      const totalPages = Math.ceil(totalActivationsCount / limit);
+      const totalActivationsCount =
+        result.metadata[0]?.totalActivationsCount || 0;
+      const totalPages = Math.ceil(totalActivationsCount / parseInt(limit));
 
       res.status(httpStatus.OK).json({
         status: "success",
         msg: "Fetched All Activations",
         data: {
           totalResults: totalActivationsCount,
-          totalPages: totalPages,
+          totalPages,
           currentPage: parseInt(page),
-          activations: allActivations,
+          activations: result.activations,
         },
       });
     } catch (error) {
-      console.error("Error fetching activations:", error);
+      console.error("Error in fetchAllActivations:", error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "An unexpected error occurred while fetching activations.",
-        stack: process.env.NODE_ENV === "dev" ? error.stack : {},
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
     }
   },
+
   uploadActivations: async (req, res) => {
     if (!req.file.path) {
       return res.status(httpStatus.NOT_FOUND).json({
@@ -364,7 +389,6 @@ module.exports = {
         msg: "Data inserted successfully",
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing CSV file",
@@ -409,7 +433,6 @@ module.exports = {
         data: updatedActivation,
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error updating activation",
@@ -477,6 +500,147 @@ module.exports = {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error fetching activations",
+        stack: nodeEnv === "dev" ? error.stack : {},
+      });
+    }
+  },
+
+  downloadAllActivations: async (req, res) => {
+    const { role, _id: authUserId } = req.authUser;
+
+    console.log("--HITTED--", req.authUser);
+
+    try {
+      const match = {};
+
+      if (role === "dealer") {
+        if (!ObjectId.isValid(authUserId)) {
+          return res.status(httpStatus.BAD_REQUEST).json({
+            status: "fail",
+            msg: "Invalid dealer ID.",
+          });
+        }
+        match.dealer = new ObjectId(authUserId);
+      }
+
+      const aggregationPipeline = [
+        {
+          $lookup: {
+            from: "keys",
+            localField: "key",
+            foreignField: "_id",
+            as: "keyDetails",
+          },
+        },
+        { $unwind: "$keyDetails" },
+        {
+          $lookup: {
+            from: "dealers",
+            localField: "dealer",
+            foreignField: "_id",
+            as: "dealerDetails",
+          },
+        },
+        { $unwind: "$dealerDetails" },
+        { $match: match },
+        {
+          $project: {
+            _id: 1,
+            licenseKey: 1,
+            licenseNo: 1,
+            name: 1,
+            email: 1,
+            phone: 1,
+            dealerPhone: 1,
+            purchasedOn: 1,
+            expiresOn: 1,
+            status: 1,
+            dealer: "$dealerDetails",
+            type: 1,
+            isNFR: 1,
+            city: 1,
+            district: 1,
+            pinCode: 1,
+            "keyDetails.subBoxNo": 1,
+            "keyDetails.mainBoxNo": 1,
+            "keyDetails.isNFR": 1,
+          },
+        },
+        { $sort: { purchasedOn: -1 } },
+      ];
+
+      const allActivations = await Activation.aggregate(aggregationPipeline);
+
+      if (!allActivations || allActivations.length === 0) {
+        return res.status(httpStatus.NOT_FOUND).json({
+          status: "fail",
+          msg: "No activations found.",
+        });
+      }
+
+      const headers = [
+        "ID",
+        "LICENSE NO",
+        "LICENSE KEY",
+        "NAME",
+        "EMAIL",
+        "DEALER PHONE",
+        "PRODUCT TYPE",
+        "PURCHASED ON",
+        "EXPIRES ON",
+        "STATUS",
+        "CITY",
+        "DISTRICT",
+        "PIN CODE",
+        "SUB BOX NO",
+        "MAIN BOX NO",
+        "IS NFR",
+      ];
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="Activations-${
+          new Date().toISOString().split("T")[0]
+        }.csv"`
+      );
+
+      const csvStream = csv.format({ headers: headers });
+      csvStream.pipe(res);
+
+      allActivations.forEach((activation, index) => {
+        csvStream.write({
+          ID: index + 1,
+          "LICENSE NO": activation.licenseNo,
+          "LICENSE KEY": activation.licenseKey,
+          NAME: activation.name,
+          EMAIL: activation.email,
+          "DEALER PHONE": `="${activation.dealerPhone}"`,
+          "PRODUCT TYPE": activation.type,
+          "PURCHASED ON": `="${format(
+            new Date(activation.purchasedOn),
+            "dd/MM/yyyy"
+          )}"`,
+          "EXPIRES ON": `="${format(
+            new Date(activation.expiresOn),
+            "dd/MM/yyyy"
+          )}"`,
+          STATUS:
+            new Date(activation.expiresOn) >= new Date() ? "ACTIVE" : "EXPIRED",
+          CITY: activation.city,
+          DISTRICT: activation.district,
+          "PIN CODE": activation.pinCode || "",
+          "SUB BOX NO": activation.keyDetails.subBoxNo || "",
+          "MAIN BOX NO": activation.keyDetails.mainBoxNo || "",
+          "IS NFR": activation.isNFR ? "YES" : "NO",
+        });
+      });
+
+      csvStream.end();
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: "An unexpected error occurred while downloading activations.",
         stack: nodeEnv === "dev" ? error.stack : {},
       });
     }

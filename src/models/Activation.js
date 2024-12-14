@@ -70,5 +70,7 @@ const activationSchema = new mongoose.Schema(
   }
 );
 
+activationSchema.index({ licenseNo: 1, purchasedOn: -1, expiresOn: 1 });
+
 const Activation = mongoose.model("Activation", activationSchema);
 module.exports = Activation;

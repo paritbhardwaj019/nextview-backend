@@ -4,6 +4,12 @@ const activationController = require("../controllers/Activation");
 const upload = require("../utils/upload");
 const authenticationMiddleware = require("../middlewares/authenticationMiddleware");
 
+router.get(
+  "/download",
+  authenticationMiddleware(["admin"]),
+  activationController.downloadAllActivations
+);
+
 router
   .route("/")
   .get(

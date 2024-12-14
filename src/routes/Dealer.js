@@ -42,4 +42,10 @@ router.post("/signup/send-phone-otp", dealerController.sendOTPAfterSignup);
 router.post("/signin/send-otp", dealerController.sendOTPForSignin);
 router.get("/auth-type", dealerController.getAuthType);
 
+router.get(
+  "/birthdays",
+  authenticationMiddleware(["admin"]),
+  dealerController.getBirthdayDealers
+);
+
 module.exports = router;

@@ -121,7 +121,6 @@ module.exports = {
         data: newDealer,
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",
@@ -515,33 +514,43 @@ module.exports = {
       });
     }
   },
+
   editDealerById: async (req, res) => {
     const { id } = req.params;
     delete req.body.authType;
 
     try {
-      const user = await Dealer.findById(id);
+      const dealer = await Dealer.findById(id);
 
-      if (!user) {
+      if (!dealer) {
         return res.status(httpStatus.BAD_REQUEST).json({
           status: "fail",
           msg: "Dealer not found. Please check the provided ID.",
         });
       }
 
-      let profilePic = "";
-      if (req.body.profilePic) {
+      let profilePic;
+      if (req.file) {
         const { secure_url } = await uploadImageToCloudinary(req.file.path);
         profilePic = secure_url;
       }
 
-      const updatedDealer = await Dealer.findByIdAndUpdate(
-        id,
-        { ...req.body, profilePic },
-        {
-          new: true,
-        }
-      );
+      const updateData = { ...req.body };
+
+      if (profilePic) {
+        updateData.profilePic = profilePic;
+      }
+
+      if (req.body.dateOfBirth) {
+        updateData.dateOfBirth = new Date(req.body.dateOfBirth);
+      }
+
+      delete updateData.password;
+      delete updateData.role;
+
+      const updatedDealer = await Dealer.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
 
       res.status(httpStatus.OK).json({
         status: "success",
@@ -555,7 +564,6 @@ module.exports = {
       });
     }
   },
-
   deleteDealerById: async (req, res) => {
     try {
       const { id } = req.params;
@@ -577,7 +585,6 @@ module.exports = {
         msg: "Dealer deleted successfully",
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",
@@ -630,5 +637,88 @@ module.exports = {
         });
       }
     } catch (error) {}
+  },
+
+  getBirthdayDealers: async (req, res) => {
+    try {
+      const today = new Date();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 25;
+      const skip = (page - 1) * limit;
+
+      const timezone = "Asia/Kolkata";
+      const pipeline = [
+        {
+          $addFields: {
+            dayOfBirth: {
+              $dayOfMonth: {
+                date: "$dateOfBirth",
+                timezone: timezone,
+              },
+            },
+            monthOfBirth: {
+              $month: {
+                date: "$dateOfBirth",
+                timezone: timezone,
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            dayOfBirth: today.getDate(),
+            monthOfBirth: today.getMonth() + 1,
+          },
+        },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+
+      const dealers = await Dealer.aggregate(pipeline);
+
+      const totalResults = await Dealer.aggregate([
+        {
+          $addFields: {
+            dayOfBirth: {
+              $dayOfMonth: {
+                date: "$dateOfBirth",
+                timezone: timezone,
+              },
+            },
+            monthOfBirth: {
+              $month: {
+                date: "$dateOfBirth",
+                timezone: timezone,
+              },
+            },
+          },
+        },
+        {
+          $match: {
+            dayOfBirth: today.getDate(),
+            monthOfBirth: today.getMonth() + 1,
+          },
+        },
+        {
+          $count: "total",
+        },
+      ]);
+
+      const totalPages = Math.ceil((totalResults[0]?.total || 0) / limit);
+
+      res.status(httpStatus.OK).json({
+        status: "success",
+        data: {
+          dealers,
+          totalResults: totalResults[0]?.total || 0,
+          totalPages,
+        },
+      });
+    } catch (error) {
+      res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+        status: "fail",
+        msg: error.message,
+      });
+    }
   },
 };

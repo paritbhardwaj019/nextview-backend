@@ -6,6 +6,36 @@ const fs = require("fs");
 const extractKeyType = require("../utils/extractKeyType");
 const containsNFR = require("../utils/containsNFR");
 
+const isValidKeyFormat = (data) => {
+  const mainBoxPattern = /^KA\d{2}-\d{4}-[A-Z]{2}-\d{3}$/;
+
+  const subBoxPattern = /^KA\d{2}-\d{4}-[A-Z]{2}-\d{3}-[A-Z]\d{2}$/;
+
+  const licensePattern = /^KAV\d{9}$/;
+
+  const keyPattern = /^\d{8}$/;
+
+  return {
+    isValid:
+      mainBoxPattern.test(data.mainBoxNo) &&
+      subBoxPattern.test(data.subBoxNo) &&
+      licensePattern.test(data.license) &&
+      keyPattern.test(data.key),
+    errors: {
+      mainBoxNo: !mainBoxPattern.test(data.mainBoxNo)
+        ? "Invalid main box number format"
+        : null,
+      subBoxNo: !subBoxPattern.test(data.subBoxNo)
+        ? "Invalid sub box number format"
+        : null,
+      license: !licensePattern.test(data.license)
+        ? "Invalid license format"
+        : null,
+      key: !keyPattern.test(data.key) ? "Invalid key format" : null,
+    },
+  };
+};
+
 module.exports = {
   uploadKeys: async (req, res) => {
     try {
@@ -13,6 +43,7 @@ module.exports = {
       const sheetNames = file.SheetNames;
 
       const bulkData = [];
+      const invalidEntries = [];
 
       for (const sheetName of sheetNames) {
         const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
@@ -25,6 +56,25 @@ module.exports = {
             ["main_box_number"]: mainBoxNo,
             ["product_type"]: type,
           }) => {
+            const keyData = {
+              subBoxNo,
+              license,
+              key,
+              mainBoxNo,
+              type: extractKeyType(type),
+              isNFR: containsNFR(type),
+            };
+
+            const validation = isValidKeyFormat(keyData);
+
+            if (!validation.isValid) {
+              invalidEntries.push({
+                ...keyData,
+                errors: validation.errors,
+              });
+              return;
+            }
+
             const index = bulkData.findIndex(
               (item) =>
                 item.subBoxNo === subBoxNo ||
@@ -33,14 +83,7 @@ module.exports = {
             );
 
             if (index === -1) {
-              bulkData.push({
-                subBoxNo,
-                license,
-                key,
-                type: extractKeyType(type),
-                mainBoxNo,
-                isNFR: containsNFR(type),
-              });
+              bulkData.push(keyData);
             }
           }
         );
@@ -78,6 +121,13 @@ module.exports = {
       res.status(httpStatus.CREATED).json({
         status: "success",
         msg: "Data inserted successfully",
+        summary: {
+          totalProcessed: arr.length,
+          validKeysUploaded: filteredData.length,
+          invalidEntries: invalidEntries.length,
+          duplicatesSkipped: bulkData.length - filteredData.length,
+        },
+        invalidEntries: invalidEntries.length > 0 ? invalidEntries : undefined,
       });
     } catch (error) {
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
