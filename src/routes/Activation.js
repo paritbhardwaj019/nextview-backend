@@ -6,7 +6,7 @@ const authenticationMiddleware = require("../middlewares/authenticationMiddlewar
 
 router.get(
   "/download",
-  authenticationMiddleware(["admin"]),
+  authenticationMiddleware(["admin", "dealer"]),
   activationController.downloadAllActivations
 );
 

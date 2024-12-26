@@ -174,6 +174,7 @@ module.exports = {
 
     try {
       const match = {};
+      const hasFilters = !!(search || startDate || endDate || status || type);
 
       if (search) {
         const searchRegex = new RegExp(
@@ -286,11 +287,12 @@ module.exports = {
             keyDetails: 1,
             dealerDetails: {
               _id: "$dealerDetails._id",
-              name: "$dealerDetails.name",
-              phone: "$dealerDetails.phone",
+              name: "$dealerDetails.ownerName",
+              phone: "$dealerDetails.phoneNumber",
               email: "$dealerDetails.email",
               address: "$dealerDetails.address",
               city: "$dealerDetails.city",
+              gstInNumber: "$dealerDetails.gstInNumber",
               district: "$dealerDetails.district",
               state: "$dealerDetails.state",
               pinCode: "$dealerDetails.pinCode",
@@ -304,8 +306,12 @@ module.exports = {
             metadata: [{ $count: "totalActivationsCount" }],
             activations: [
               { $sort: { purchasedOn: -1 } },
-              { $skip: (parseInt(page) - 1) * parseInt(limit) },
-              { $limit: parseInt(limit) },
+              ...(hasFilters
+                ? []
+                : [
+                    { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                    { $limit: parseInt(limit) },
+                  ]),
             ],
           },
         },
@@ -323,7 +329,7 @@ module.exports = {
         data: {
           totalResults: totalActivationsCount,
           totalPages,
-          currentPage: parseInt(page),
+          currentPage: hasFilters ? 1 : parseInt(page),
           activations: result.activations,
         },
       });
@@ -543,11 +549,8 @@ module.exports = {
   downloadAllActivations: async (req, res) => {
     const { role, _id: authUserId } = req.authUser;
 
-    console.log("--HITTED--", req.authUser);
-
     try {
       const match = {};
-
       if (role === "dealer") {
         if (!ObjectId.isValid(authUserId)) {
           return res.status(httpStatus.BAD_REQUEST).json({
@@ -613,13 +616,12 @@ module.exports = {
         });
       }
 
-      const headers = [
+      const baseHeaders = [
         "ID",
         "LICENSE NO",
         "LICENSE KEY",
         "NAME",
         "EMAIL",
-        "DEALER PHONE",
         "PRODUCT TYPE",
         "PURCHASED ON",
         "EXPIRES ON",
@@ -631,6 +633,15 @@ module.exports = {
         "MAIN BOX NO",
         "IS NFR",
       ];
+
+      const headers =
+        role === "dealer"
+          ? baseHeaders
+          : [
+              ...baseHeaders.slice(0, 5),
+              "DEALER PHONE",
+              ...baseHeaders.slice(5),
+            ];
 
       res.setHeader("Content-Type", "text/csv");
       res.setHeader(
@@ -644,13 +655,12 @@ module.exports = {
       csvStream.pipe(res);
 
       allActivations.forEach((activation, index) => {
-        csvStream.write({
+        const baseData = {
           ID: index + 1,
           "LICENSE NO": activation.licenseNo,
           "LICENSE KEY": activation.licenseKey,
           NAME: activation.name,
           EMAIL: activation.email,
-          "DEALER PHONE": `="${activation.dealerPhone}"`,
           "PRODUCT TYPE": activation.type,
           "PURCHASED ON": `="${format(
             new Date(activation.purchasedOn),
@@ -668,11 +678,23 @@ module.exports = {
           "SUB BOX NO": activation.keyDetails.subBoxNo || "",
           "MAIN BOX NO": activation.keyDetails.mainBoxNo || "",
           "IS NFR": activation.isNFR ? "YES" : "NO",
-        });
+        };
+
+        const rowData =
+          role === "dealer"
+            ? baseData
+            : {
+                ...Object.fromEntries(Object.entries(baseData).slice(0, 5)),
+                "DEALER PHONE": `="${activation.dealerPhone}"`,
+                ...Object.fromEntries(Object.entries(baseData).slice(5)),
+              };
+
+        csvStream.write(rowData);
       });
 
       csvStream.end();
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "An unexpected error occurred while downloading activations.",
