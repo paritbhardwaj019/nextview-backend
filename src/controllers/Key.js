@@ -44,9 +44,11 @@ module.exports = {
 
       const bulkData = [];
       const invalidEntries = [];
+      let totalProcessed = 0;
 
       for (const sheetName of sheetNames) {
         const arr = excelReader.utils.sheet_to_json(file.Sheets[sheetName]);
+        totalProcessed += arr.length;
 
         arr.forEach(
           ({
@@ -122,7 +124,7 @@ module.exports = {
         status: "success",
         msg: "Data inserted successfully",
         summary: {
-          totalProcessed: arr.length,
+          totalProcessed: totalProcessed,
           validKeysUploaded: filteredData.length,
           invalidEntries: invalidEntries.length,
           duplicatesSkipped: bulkData.length - filteredData.length,
@@ -130,6 +132,7 @@ module.exports = {
         invalidEntries: invalidEntries.length > 0 ? invalidEntries : undefined,
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing Excel file",
