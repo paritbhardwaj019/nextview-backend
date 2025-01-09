@@ -91,32 +91,51 @@ module.exports = {
         );
       }
 
-      const existingActivations = await Activation.find({
-        licenseNo: { $in: bulkData.map((data) => data.license) },
-      });
-
-      const existingKeys = await Key.find({
-        $or: [
-          { license: { $in: bulkData.map((data) => data.license) } },
-          { key: { $in: bulkData.map((data) => data.key) } },
-        ],
-      });
+      const [existingKeys, existingActivations] = await Promise.all([
+        Key.find({
+          $or: [{ license: { $in: bulkData.map((data) => data.license) } }],
+        }),
+        Activation.find({
+          licenseNo: { $in: bulkData.map((data) => data.license) },
+        }),
+      ]);
 
       const filteredData = bulkData.filter(
         (data) =>
-          !existingActivations.some(
-            (activation) => activation.licenseNo === data.license
-          ) &&
           !existingKeys.some(
-            (existingKey) =>
-              existingKey.license === data.license ||
-              existingKey.key === data.key
+            (existingKey) => existingKey.license === data.license
           )
       );
 
+      let insertedKeys = [];
       if (filteredData.length > 0) {
-        await Key.insertMany(filteredData);
+        const keysToInsert = filteredData.map((keyData) => {
+          const hasActivation = existingActivations.some(
+            (activation) => activation.licenseNo === keyData.license
+          );
+          return {
+            ...keyData,
+            status: hasActivation ? "activated" : "available",
+          };
+        });
+
+        insertedKeys = await Key.insertMany(keysToInsert);
       }
+
+      const updatePromises = existingActivations.map(async (activation) => {
+        const matchingKey = insertedKeys.find(
+          (key) => key.license === activation.licenseNo
+        );
+        if (matchingKey) {
+          await Activation.findByIdAndUpdate(
+            activation._id,
+            { key: matchingKey._id },
+            { new: true }
+          );
+        }
+      });
+
+      await Promise.all(updatePromises);
 
       fs.unlinkSync(req.file.path);
 
@@ -132,7 +151,6 @@ module.exports = {
         invalidEntries: invalidEntries.length > 0 ? invalidEntries : undefined,
       });
     } catch (error) {
-      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing Excel file",
@@ -175,9 +193,10 @@ module.exports = {
       let allKeys;
 
       if (searchQuery) {
-        allKeys = await Key.find(query).exec();
+        allKeys = await Key.find(query).sort({ createdAt: -1 }).exec();
       } else {
         allKeys = await Key.find(query)
+          .sort({ createdAt: -1 })
           .limit(itemsPerPage)
           .skip((currentPage - 1) * itemsPerPage)
           .exec();
