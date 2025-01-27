@@ -1,67 +1,42 @@
-const { resendConfig } = require("../config");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-// const mailJet = new Mailjet({
-//   apiKey: mailJetConfig.apiKey,
-//   apiSecret: mailJetConfig.apiSecret,
-// });
+const emailConfig = {
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "no_reply@nextviewkavach.in",
+    pass: "b14ck-cyph3R",
+  },
+};
 
-// function sendMail({ toEmail, toName, subject, textPart, htmlPart }) {
-//   return new Promise((resolve, reject) => {
-//     mailJet
-//       .post("send", { version: "v3.1" })
-//       .request({
-//         Messages: [
-//           {
-//             From: {
-//               Email: mailJetConfig.fromEmail,
-//               Name: mailJetConfig.fromName,
-//             },
-//             To: [
-//               {
-//                 Email: toEmail,
-//                 Name: toName,
-//               },
-//             ],
-//             Subject: subject,
-//             TextPart: textPart,
-//             HTMLPart: htmlPart,
-//           },
-//         ],
-//       })
-//       .then((result) => {
-//         resolve(result.body);
-//       })
-//       .catch((err) => {
-//         console.log(err);
-//         reject(err.statusCode);
-//       });
-//   });
-// }
-
-// module.exports = sendMail;
-
-const resend = new Resend(resendConfig.apiKey);
+const transporter = nodemailer.createTransport(emailConfig);
 
 async function sendMail({ toEmail, toName, subject, textPart, htmlPart }) {
   return new Promise((resolve, reject) => {
-    resend.emails
-      .send({
-        from: `${resendConfig.fromName} <${resendConfig.fromEmail}>`,
-        to: toEmail,
-        subject,
-        html: htmlPart,
-        text: textPart,
-        headers: {
-          Importance: "high",
-          Priority: "urgent",
-          "X-Priority": "1",
-        },
+    const mailOptions = {
+      from: '"Nextview Kavach" <no_reply@nextviewkavach.in>',
+      to: `${toName} <${toEmail}>`,
+      subject: subject,
+      text: textPart,
+      html: htmlPart,
+      headers: {
+        Importance: "high",
+        Priority: "urgent",
+        "X-Priority": "1",
+      },
+    };
+
+    transporter
+      .sendMail(mailOptions)
+      .then((info) => {
+        console.log("Email sent successfully");
+        console.log("Message ID:", info.messageId);
+        resolve(info);
       })
-      .then((result) => resolve(result.data))
       .catch((error) => {
-        console.log(error);
-        return reject(error);
+        console.error("Error sending email:", error);
+        reject(error);
       });
   });
 }
