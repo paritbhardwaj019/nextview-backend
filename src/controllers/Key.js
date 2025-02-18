@@ -115,7 +115,7 @@ module.exports = {
           );
           return {
             ...keyData,
-            status: hasActivation ? "activated" : "available",
+            status: hasActivation ? "activated" : "deactivated",
           };
         });
 
@@ -151,6 +151,8 @@ module.exports = {
         invalidEntries: invalidEntries.length > 0 ? invalidEntries : undefined,
       });
     } catch (error) {
+      console.log(error);
+
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: "Error processing Excel file",
