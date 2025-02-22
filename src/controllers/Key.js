@@ -7,12 +7,16 @@ const extractKeyType = require("../utils/extractKeyType");
 const containsNFR = require("../utils/containsNFR");
 
 const isValidKeyFormat = (data) => {
-  const mainBoxPattern = /^KA\d{2}-\d{4}-[A-Z]{2}-\d{3}$/;
+  // Updated pattern to accept both KA and KZ prefixes
+  const mainBoxPattern = /^K[AZ]\d{2}-\d{4}-[A-Z]{2}-\d{3}$/;
 
-  const subBoxPattern = /^KA\d{2}-\d{4}-[A-Z]{2}-\d{3}-[A-Z]\d{2}$/;
+  // Updated pattern to accept both KA and KZ prefixes
+  const subBoxPattern = /^K[AZ]\d{2}-\d{4}-[A-Z]{2}-\d{3}-[A-Z]\d{2}$/;
 
+  // License pattern remains the same as it's standardized
   const licensePattern = /^KAV\d{9}$/;
 
+  // Key pattern remains the same as it's standardized
   const keyPattern = /^\d{8}$/;
 
   return {
@@ -68,6 +72,8 @@ module.exports = {
             };
 
             const validation = isValidKeyFormat(keyData);
+
+            console.log("validation", validation);
 
             if (!validation.isValid) {
               invalidEntries.push({
