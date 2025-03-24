@@ -1,38 +1,27 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const emailConfig = {
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "no_reply@nextviewkavach.in",
-    pass: "b14ck-cyph3R",
-  },
-};
-
-const transporter = nodemailer.createTransport(emailConfig);
+const resend = new Resend("re_69cTxgCz_3U22g1vSodKSveoZpxRwe79s");
 
 async function sendMail({ toEmail, toName, subject, textPart, htmlPart }) {
   return new Promise((resolve, reject) => {
-    const mailOptions = {
-      from: '"Nextview Kavach" <no_reply@nextviewkavach.in>',
-      to: `${toName} <${toEmail}>`,
-      subject: subject,
-      text: textPart,
-      html: htmlPart,
-      headers: {
-        Importance: "high",
-        Priority: "urgent",
-        "X-Priority": "1",
-      },
-    };
-
-    transporter
-      .sendMail(mailOptions)
-      .then((info) => {
+    resend.emails
+      .send({
+        from: "Nextview Kavach <notifications@nextviewkavach.in>",
+        to: [`${toName} <${toEmail}>`],
+        subject: subject,
+        text: textPart,
+        html: htmlPart,
+        headers: {
+          Importance: "high",
+          Priority: "urgent",
+          "X-Priority": "1",
+        },
+      })
+      .then((response) => {
+        console.log(response);
         console.log("Email sent successfully");
-        console.log("Message ID:", info.messageId);
-        resolve(info);
+        console.log("Message ID:", response.data.id);
+        resolve(response);
       })
       .catch((error) => {
         console.error("Error sending email:", error);

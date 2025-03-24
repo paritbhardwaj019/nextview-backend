@@ -223,6 +223,7 @@ module.exports = {
         data: { user, token },
       });
     } catch (error) {
+      console.log(error);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
         status: "fail",
         msg: error.message || "Something went wrong",
@@ -267,6 +268,8 @@ module.exports = {
           otp,
           name: user?.ownerName,
         });
+
+        console.log(user.email, user.ownerName, htmlPart);
 
         await sendMail({
           toEmail: user.email,
